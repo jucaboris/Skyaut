@@ -19,6 +19,7 @@ const db = getDatabase(app);
 const urlParams = new URLSearchParams(window.location.search);
 const isMaster = urlParams.get('master') === 'true';
 const playerRole = urlParams.get('role');
+const voterId = !isMaster && playerRole ? getOrCreateVoterId(playerRole) : null;
 
 // DOM Elements
 const briefingScreen = document.getElementById('briefing-screen');
@@ -30,6 +31,25 @@ const playerWarning = document.getElementById('player-warning');
 
 // Game State
 let currentState = null;
+
+function getOrCreateVoterId(role) {
+    const storageKey = `skyaut-voter-id-${role}`;
+    const savedId = localStorage.getItem(storageKey);
+    if (savedId) return savedId;
+
+    const suffix = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    const newId = `${role}-${suffix}`;
+    localStorage.setItem(storageKey, newId);
+    return newId;
+}
+
+function getVoteOptionId(voteValue) {
+    if (!voteValue) return null;
+    return typeof voteValue === 'object' ? voteValue.optionId : voteValue;
+}
 
 // Inicialização
 document.getElementById('btn-start-briefing').addEventListener('click', () => {
@@ -58,7 +78,8 @@ function initPlayer() {
 
 function renderPlayerUI() {
     document.getElementById('player-mode').innerText = `Modo: ${currentState.mode}`;
-    document.getElementById('player-timer').innerText = `${currentState.timer}s`;
+    const timerLabel = currentState.phase === 'VOTING' ? `${currentState.timer}s` : 'Aguardando início';
+    document.getElementById('player-timer').innerText = timerLabel;
     
     playerDashboard.innerHTML = '';
     playerWarning.classList.add('hidden');
@@ -100,7 +121,8 @@ function renderPlayerUI() {
             btn.disabled = isDisabled;
             
             // Marca se já votou
-            if (currentState.votes && currentState.votes[actionKey] && currentState.votes[actionKey][playerRole] === opt.id) {
+            const myVote = currentState.votes && currentState.votes[actionKey] ? currentState.votes[actionKey][voterId] : null;
+            if (getVoteOptionId(myVote) === opt.id) {
                 btn.classList.add('selected');
             }
 
@@ -115,7 +137,10 @@ function renderPlayerUI() {
 
 function submitVote(actionKey, optionId) {
     update(ref(db, `gameState/votes/${actionKey}`), {
-        [playerRole]: optionId
+        [voterId]: {
+            role: playerRole,
+            optionId
+        }
     });
 }
 
@@ -127,7 +152,7 @@ function initMaster() {
     set(ref(db, 'gameState'), {
         phase: 'IDLE',
         mode: 'G1',
-        timer: 120,
+        timer: 0,
         votes: {}
     });
 
@@ -136,7 +161,10 @@ function initMaster() {
         if(!currentState) return;
         
         document.getElementById('master-mode').innerText = `Rodada: ${currentState.mode}`;
-        document.getElementById('master-timer').innerText = `Tempo: ${currentState.timer}s`;
+        const timerText = currentState.phase === 'VOTING' ? `${currentState.timer}s` : 'Aguardando início';
+        document.getElementById('master-timer').innerText = `Tempo: ${timerText}`;
+
+        if (currentState.phase !== 'VOTING') clearInterval(timerInterval);
         
         renderMasterUI();
     });
@@ -168,7 +196,8 @@ function advanceMode() {
     else if (currentState.mode === 'G2') nextMode = 'G3';
     else alert("Missão concluída com sucesso! Jogo finalizado.");
 
-    update(ref(db, 'gameState'), { phase: 'IDLE', mode: nextMode, timer: 120, votes: {} });
+    clearInterval(timerInterval);
+    update(ref(db, 'gameState'), { phase: 'IDLE', mode: nextMode, timer: 0, votes: {} });
 }
 
 function renderMasterUI() {
@@ -183,7 +212,7 @@ function renderMasterUI() {
         // Verifica conflitos no modo G2
         let votesForThisAction = currentState.votes ? currentState.votes[actionKey] : null;
         if (currentState.mode === 'G2' && votesForThisAction) {
-            const uniqueVotes = new Set(Object.values(votesForThisAction));
+            const uniqueVotes = new Set(Object.values(votesForThisAction).map(getVoteOptionId).filter(Boolean));
             if (uniqueVotes.size > 1) {
                 card.innerHTML += `<div style="color:red; font-weight:bold; margin-bottom:10px;">⚠️ CONFLITO DETECTADO NA EQUIPE</div>`;
             }
@@ -200,7 +229,7 @@ function renderMasterUI() {
             let voteCount = 0;
             if (votesForThisAction) {
                 Object.values(votesForThisAction).forEach(v => {
-                    if(v === opt.id) voteCount++;
+                    if(getVoteOptionId(v) === opt.id) voteCount++;
                 });
             }
             
