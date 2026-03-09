@@ -1,25 +1,205 @@
+/* --- style.css --- */
+
 :root {
-    --carmen-red: #c1272d;
-    --blueprint-blue: #1a365d;
-    --paper-bg: #fdf6e3;
-    --dark-text: #2d3748;
-    --accent-gold: #d4af37;
+    /* Paleta de Cores da Interface (Inspirada na Referência) */
+    --win-bg-grey: #c0c0c0; /* Cinza claro de fundo da janela */
+    --win-border-light: #ffffff; /* Borda clara para o efeito 3D */
+    --win-border-dark: #808080; /* Borda escura para o efeito 3D */
+    --btn-red-bg: #c1272d; /* Vermelho escuro dos botões da referência */
+    --btn-red-border-light: #ef4f5a; /* Borda clara do botão */
+    --btn-red-border-dark: #7a181c; /* Borda escura do botão */
+    --title-blue: #000080; /* Azul escuro da barra de título */
+    --text-color: #000000;
+}
+
+/* Fontes: Importante usar fontes pixeladas para o estilo */
+@font-face {
+    font-family: 'Pixelated';
+    src: url('https://fonts.cdnfonts.com/s/14873/Volter__28Goldfish_29.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
 }
 
 body {
     margin: 0;
-    font-family: 'Courier New', Courier, monospace; /* Traz a vibe de máquina de escrever/relatório */
-    background-color: var(--blueprint-blue);
-    background-image: radial-gradient(var(--carmen-red) 1px, transparent 1px);
-    background-size: 20px 20px;
-    color: var(--dark-text);
+    padding: 0;
+    font-family: 'Pixelated', 'Courier New', monospace; /* Fonte principal */
+    background-color: #000; /* Fundo preto padrão */
+    color: var(--text-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    overflow: hidden; /* Evita barras de rolagem globais */
 }
 
+/* --- Container de Fundo Dinâmico --- */
+/* Este elemento cobre toda a tela e troca de imagem baseado na orientação */
+body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1; /* Fica atrás de tudo */
+    background-size: cover;
+    background-position: center bottom; /* Alinha a cidade na base */
+    background-repeat: no-repeat;
+}
+
+/* Retrato (Celular) - Useimage_0.png */
+@media (orientation: portrait) {
+    body::before {
+        background-image: url('background-portrait.png');
+    }
+}
+
+/* Paisagem (Desktop) - Useimage_1.png */
+@media (orientation: landscape) {
+    body::before {
+        background-image: url('background-landscape.png');
+    }
+}
+
+/* --- Estilo das Janelas (Windows 95/Retro Digital) --- */
+.dossier, .master-header, .player-header, .action-card, .modal-content {
+    background-color: var(--win-bg-grey);
+    border-top: 2px solid var(--win-border-light);
+    border-left: 2px solid var(--win-border-light);
+    border-bottom: 2px solid var(--win-border-dark);
+    border-right: 2px solid var(--win-border-dark);
+    box-shadow: 1px 1px 0px #000;
+    padding: 0; /* O padding será controlado internamente */
+    max-width: 600px;
+    width: 90%;
+}
+
+/* --- Barra de Título da Janela --- */
+.master-header h2, .player-header h2, .modal-content h2, .dossier h1 {
+    background-color: var(--title-blue);
+    color: white;
+    margin: 0;
+    padding: 4px 8px;
+    font-size: 14px;
+    font-weight: normal;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* --- Conteúdo Interno da Janela --- */
+.dossier p, .master-dashboard, .player-dashboard, .modal-content p {
+    padding: 15px;
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+/* Estilo para h3 dentro dos cards (Subtítulos de seção) */
+.action-card h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--win-border-dark);
+    padding-bottom: 3px;
+    color: var(--text-color);
+}
+
+/* --- Botões Vermelhos Estilo Referência --- */
+button, .option-btn {
+    background-color: var(--btn-red-bg);
+    color: white;
+    border-top: 2px solid var(--btn-red-border-light);
+    border-left: 2px solid var(--btn-red-border-light);
+    border-bottom: 2px solid var(--btn-red-border-dark);
+    border-right: 2px solid var(--btn-red-border-dark);
+    padding: 6px 12px;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: normal;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: none; /* Sem suavização para estilo retro */
+    margin: 4px;
+    box-shadow: 1px 1px 0px #000;
+}
+
+button:active, .option-btn:active {
+    border-top: 2px solid var(--btn-red-border-dark);
+    border-left: 2px solid var(--btn-red-border-dark);
+    border-bottom: 2px solid var(--btn-red-border-light);
+    border-right: 2px solid var(--btn-red-border-light);
+    box-shadow: inset 1px 1px 2px #000;
+}
+
+button:disabled, .option-btn:disabled {
+    background-color: #7f7f7f;
+    border-color: #999;
+    color: #444;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+/* Botão selecionado (efeito "afundado") */
+.option-btn.selected {
+    border-top: 2px solid var(--btn-red-border-dark);
+    border-left: 2px solid var(--btn-red-border-dark);
+    border-bottom: 2px solid var(--btn-red-border-light);
+    border-right: 2px solid var(--btn-red-border-light);
+    background-color: #9a1f24; /* Um vermelho ligeiramente mais escuro */
+    box-shadow: inset 1px 1px 2px #000;
+}
+
+/* --- Layouts Específicos --- */
+
+/* Grelha de botões */
+.options-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 0 10px 10px 10px;
+}
+
+/* Painel de status (Rodada/Tempo) */
+.status-bar {
+    display: flex;
+    gap: 15px;
+    font-size: 12px;
+    color: white;
+    padding-right: 10px;
+}
+
+/* Ajustes de Header */
+.master-header, .player-header {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.player-header h2 {
+    width: auto;
+}
+
+/* Caixa de aviso amarela */
+.warning-box {
+    background-color: #ffcc00;
+    color: black;
+    padding: 8px;
+    border: 2px dashed #000;
+    margin: 10px auto;
+    width: 85%;
+    text-align: center;
+    font-size: 12px;
+}
+
+/* --- Sistema de Telas e Modais --- */
 .screen {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 20px;
+    justify-content: center;
+    width: 100%;
     min-height: 100vh;
 }
 
@@ -27,112 +207,17 @@ body {
     display: none !important;
 }
 
-.dossier {
-    background-color: var(--paper-bg);
-    border: 2px solid var(--dark-text);
-    padding: 30px;
-    max-width: 600px;
-    box-shadow: 10px 10px 0px rgba(0,0,0,0.5);
-    position: relative;
-}
-
-.dossier::before {
-    content: "TOP SECRET";
-    position: absolute;
-    top: -15px;
-    left: 20px;
-    background: var(--carmen-red);
-    color: white;
-    padding: 5px 10px;
-    font-weight: bold;
-    transform: rotate(-5deg);
-}
-
-button {
-    background-color: var(--carmen-red);
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    font-family: inherit;
-    font-weight: bold;
-    cursor: pointer;
-    text-transform: uppercase;
-    transition: background 0.2s;
-    margin-top: 10px;
-}
-
-button:hover {
-    background-color: #a02025;
-}
-
-button:disabled {
-    background-color: #7a7a7a;
-    cursor: not-allowed;
-}
-
-.master-header, .player-header {
-    background: var(--paper-bg);
-    width: 100%;
-    max-width: 800px;
-    padding: 15px;
-    border-bottom: 4px solid var(--carmen-red);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-}
-
-.dashboard {
-    width: 100%;
-    max-width: 800px;
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 15px;
-}
-
-.action-card {
-    background: var(--paper-bg);
-    border: 1px solid var(--dark-text);
-    padding: 15px;
-    box-shadow: 4px 4px 0px rgba(0,0,0,0.2);
-}
-
-.action-card h3 {
-    margin-top: 0;
-    color: var(--blueprint-blue);
-    border-bottom: 2px solid var(--accent-gold);
-    padding-bottom: 5px;
-}
-
-.options-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-}
-
-.option-btn.selected {
-    background-color: var(--blueprint-blue);
-    border: 2px solid var(--accent-gold);
-}
-
-.warning-box {
-    background-color: #ffcc00;
-    color: black;
-    padding: 10px;
-    border: 2px dashed black;
-    margin-bottom: 15px;
-    width: 100%;
-    max-width: 800px;
-    text-align: center;
-    font-weight: bold;
-}
-
 .modal {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.8);
+    background: rgba(0,0,0,0.85); /* Fundo mais escuro */
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 1000;
+}
+
+/* Ajuste específico para o modal parecer uma janela */
+.modal-content {
+    max-width: 400px;
 }
