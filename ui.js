@@ -471,28 +471,97 @@ function bindUI() {
     const responsibility = masterSelectedResponsibility;
     const actionId = masterSelectedAction;
     if (!responsibility || !actionId) return;
-    
+
     const result = resolveResponsibility(state, responsibility, actionId);
-    
+
     if (!result.ok) {
       showPopup("Erro Tático", result.reason || "Não é possível executar isso agora.");
       return;
     }
-    
+
     await publishState();
     await publishPhase();
     render();
 
     if (result.failed) {
-      pendingAutoAdvance = true; 
-      showPopup("FALHA NA OPERAÇÃO", `${state.lastFailure}\n\nO avião sofreu danos críticos. A rodada atual foi perdida. Reagrupando equipe para nova dinâmica tática.`);
+      pendingAutoAdvance = true;
+      showPopup("FALHA NA OPERAÇÃO", `${state.lastFailure}
+
+O avião sofreu danos críticos. A rodada atual foi perdida. Reagrupando equipe para nova dinâmica tática.`);
       return;
     }
 
     if (result.completedAllResponsibilities) {
-      pendingAutoAdvance = true; 
+      pendingAutoAdvance = true;
       if (state.mode === "G3") {
-         showPopup("MISSÃO CUMPRIDA!", "A equipe agiu de forma impecável. Terrorista contido e bomba desarmada sem nenhuma baixa.\n\nFim de jogo. Parabéns a todos!");
-         pendingAutoAdvance = false; 
+        showPopup("MISSÃO CUMPRIDA!", "A equipe agiu de forma impecável. Terrorista contido e bomba desarmada sem nenhuma baixa.\n\nFim de jogo. Parabéns a todos!");
+        pendingAutoAdvance = false;
       } else {
-         showPopup("RODADA CON
+        showPopup("RODADA CONCLUÍDA", "Todas as áreas foram validadas com sucesso. Preparando o próximo modo de operação.");
+      }
+    }
+  });
+
+  ui.startBtn?.addEventListener("click", startRoundWithStorytelling);
+  ui.resetBtn?.addEventListener("click", async () => {
+    if (!isMaster) return;
+    if (timer) {
+      clearInterval(timer);
+      timer = null;
+    }
+    running = false;
+    introShownInRound = false;
+    pendingRoundStart = false;
+    pendingAutoAdvance = false;
+    state = makeInitialState();
+    masterSelectedResponsibility = "command";
+    masterSelectedAction = null;
+    await remove(ref(db, DB.inputs));
+    await publishState();
+    await publishPhase();
+    render();
+  });
+
+  ui.masterEndTimeBtn?.addEventListener("click", forceEndVotingNow);
+  ui.masterNextModeBtn?.addEventListener("click", nextMode);
+}
+
+function bindMasterResponsibilitySelection() {
+  ui.masterRespButtons?.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-master-resp]");
+    if (!btn) return;
+    masterSelectedResponsibility = btn.dataset.masterResp;
+    masterSelectedAction = null;
+    renderMasterSelectors();
+  });
+
+  ui.masterActionButtons?.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-master-action]");
+    if (!btn) return;
+    masterSelectedAction = btn.dataset.masterAction;
+    renderMasterSelectors();
+  });
+}
+
+async function bootstrap() {
+  try {
+    bindUI();
+    bindMasterResponsibilitySelection();
+    bindRealtime();
+
+    if (isMaster) {
+      await publishState();
+      await publishPhase();
+    }
+
+    ui.loadingStatus.textContent = "Conexão segura estabelecida. Pronto para iniciar.";
+    ui.startExperienceBtn.disabled = false;
+    render();
+  } catch (error) {
+    console.error("Falha ao inicializar aplicação:", error);
+    ui.loadingStatus.textContent = "Falha ao conectar ao Firebase. Verifique permissões/regras e recarregue.";
+    ui.startExperienceBtn.disabled = true;
+  }
+}
+
+bootstrap();
