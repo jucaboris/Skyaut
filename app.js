@@ -22,12 +22,19 @@ const playerRole = urlParams.get('role');
 const voterId = !isMaster && playerRole ? getOrCreateVoterId(playerRole) : null;
 
 // DOM Elements
+const introVideo = document.getElementById('intro-video');
+const introContainer = document.getElementById('intro-video-container');
+const mainMenu = document.getElementById('main-menu');
 const briefingScreen = document.getElementById('briefing-screen');
 const masterScreen = document.getElementById('master-screen');
 const playerScreen = document.getElementById('player-screen');
 const playerDashboard = document.getElementById('player-dashboard');
 const masterDashboard = document.getElementById('master-dashboard');
 const playerWarning = document.getElementById('player-warning');
+const btnNewSim = document.getElementById('btn-new-sim');
+const instructionsModal = document.getElementById('instructions-modal');
+const btnInstructions = document.getElementById('btn-instructions');
+const btnCloseInstructions = document.getElementById('btn-close-instructions');
 
 // Game State
 let currentState = null;
@@ -51,7 +58,55 @@ function getVoteOptionId(voteValue) {
     return typeof voteValue === 'object' ? voteValue.optionId : voteValue;
 }
 
+function formatCountdown(totalSeconds) {
+    const safeSeconds = Math.max(0, Number(totalSeconds) || 0);
+    const minutes = String(Math.floor(safeSeconds / 60)).padStart(2, '0');
+    const seconds = String(safeSeconds % 60).padStart(2, '0');
+    return `${minutes}:${seconds}`;
+}
+
 // Inicialização
+window.addEventListener('load', () => {
+    introVideo.play().catch(() => {
+        showMainMenu();
+    });
+});
+
+introVideo.onended = showMainMenu;
+document.getElementById('skip-intro').onclick = showMainMenu;
+
+function showMainMenu() {
+    introContainer.classList.add('hidden');
+    mainMenu.classList.remove('hidden');
+}
+
+btnNewSim.onclick = () => {
+    mainMenu.classList.add('hidden');
+    briefingScreen.classList.remove('hidden');
+};
+
+btnInstructions.onclick = () => {
+    instructionsModal.classList.remove('hidden');
+};
+
+btnCloseInstructions.onclick = () => {
+    instructionsModal.classList.add('hidden');
+};
+
+
+instructionsModal.addEventListener('click', (event) => {
+    if (event.target === instructionsModal) {
+        instructionsModal.classList.add('hidden');
+    }
+});
+
+document.getElementById('btn-exit').onclick = () => {
+    if(confirm("Deseja realmente sair para o DOS?")) {
+        window.close();
+        alert("C:> SHUTDOWN -R");
+    }
+};
+
 document.getElementById('btn-start-briefing').addEventListener('click', () => {
     briefingScreen.classList.add('hidden');
     if (isMaster) {
@@ -77,9 +132,9 @@ function initPlayer() {
 }
 
 function renderPlayerUI() {
-    document.getElementById('player-mode').innerText = `Modo: ${currentState.mode}`;
-    const timerLabel = currentState.phase === 'VOTING' ? `${currentState.timer}s` : 'Aguardando início';
-    document.getElementById('player-timer').innerText = timerLabel;
+    document.getElementById('player-mode').innerText = `Rodada: ${currentState.mode}`;
+    const timerLabel = currentState.phase === 'VOTING' ? formatCountdown(currentState.timer) : '00:00';
+    document.getElementById('player-timer').innerText = `TEMPO RESTANTE: ${timerLabel}`;
     
     playerDashboard.innerHTML = '';
     playerWarning.classList.add('hidden');
@@ -161,8 +216,8 @@ function initMaster() {
         if(!currentState) return;
         
         document.getElementById('master-mode').innerText = `Rodada: ${currentState.mode}`;
-        const timerText = currentState.phase === 'VOTING' ? `${currentState.timer}s` : 'Aguardando início';
-        document.getElementById('master-timer').innerText = `Tempo: ${timerText}`;
+        const timerText = currentState.phase === 'VOTING' ? formatCountdown(currentState.timer) : '00:00';
+        document.getElementById('master-timer').innerText = `TEMPO RESTANTE: ${timerText}`;
 
         if (currentState.phase !== 'VOTING') clearInterval(timerInterval);
         
