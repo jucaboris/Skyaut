@@ -24,8 +24,8 @@ const voterId = !isMaster && playerRole ? getOrCreateVoterId(playerRole) : null;
 // DOM Elements
 const introVideo = document.getElementById('intro-video');
 const introContainer = document.getElementById('intro-video-container');
+const continueScreen = document.getElementById('continue-screen');
 const mainMenu = document.getElementById('main-menu');
-const briefingScreen = document.getElementById('briefing-screen');
 const masterScreen = document.getElementById('master-screen');
 const playerScreen = document.getElementById('player-screen');
 const playerDashboard = document.getElementById('player-dashboard');
@@ -76,16 +76,32 @@ window.addEventListener('load', () => {
 introVideo.onended = showMainMenu;
 introVideo.onerror = showMainMenu;
 document.getElementById('skip-intro').onclick = showMainMenu;
+continueScreen.onclick = openMainMenu;
 
 function showMainMenu() {
     if (introContainer.classList.contains('hidden')) return;
     introContainer.classList.add('hidden');
+    continueScreen.classList.remove('hidden');
+}
+
+function openMainMenu() {
+    continueScreen.classList.add('hidden');
     mainMenu.classList.remove('hidden');
 }
 
 btnNewSim.onclick = () => {
     mainMenu.classList.add('hidden');
-    briefingScreen.classList.remove('hidden');
+    if (isMaster) {
+        masterScreen.classList.remove('hidden');
+        initMaster();
+    } else if (playerRole) {
+        playerScreen.classList.remove('hidden');
+        document.getElementById('player-role-title').innerText = `Agente: ${playerRole.toUpperCase().replace('_', ' ')}`;
+        initPlayer();
+    } else {
+        alert("Parâmetros de URL inválidos. Use ?master=true ou ?role=comando");
+        showContinueScreen();
+    }
 };
 
 btnInstructions.onclick = () => {
@@ -104,25 +120,15 @@ instructionsModal.addEventListener('click', (event) => {
 });
 
 document.getElementById('btn-exit').onclick = () => {
-    if(confirm("Deseja realmente sair para o DOS?")) {
-        window.close();
-        alert("C:> SHUTDOWN -R");
-    }
+    showContinueScreen();
 };
 
-document.getElementById('btn-start-briefing').addEventListener('click', () => {
-    briefingScreen.classList.add('hidden');
-    if (isMaster) {
-        masterScreen.classList.remove('hidden');
-        initMaster();
-    } else if (playerRole) {
-        playerScreen.classList.remove('hidden');
-        document.getElementById('player-role-title').innerText = `Agente: ${playerRole.toUpperCase().replace('_', ' ')}`;
-        initPlayer();
-    } else {
-        alert("Parâmetros de URL inválidos. Use ?master=true ou ?role=comando");
-    }
-});
+function showContinueScreen() {
+    mainMenu.classList.add('hidden');
+    masterScreen.classList.add('hidden');
+    playerScreen.classList.add('hidden');
+    continueScreen.classList.remove('hidden');
+}
 
 // --- LÓGICA DO JOGADOR ---
 function initPlayer() {
@@ -232,10 +238,23 @@ function initMaster() {
 
     document.getElementById('btn-start-round').onclick = startRound;
     document.getElementById('btn-next-mode').onclick = advanceMode;
+    document.getElementById('btn-end-game').onclick = endGame;
     document.getElementById('btn-close-result').onclick = () => {
         document.getElementById('result-modal').classList.add('hidden');
         advanceMode();
     };
+}
+
+function endGame() {
+    clearInterval(timerInterval);
+    update(ref(db, 'gameState'), { phase: 'IDLE', mode: 'G1', timer: 0, votes: {} });
+    showMainMenuFromGame();
+}
+
+function showMainMenuFromGame() {
+    masterScreen.classList.add('hidden');
+    playerScreen.classList.add('hidden');
+    mainMenu.classList.remove('hidden');
 }
 
 function startRound() {
