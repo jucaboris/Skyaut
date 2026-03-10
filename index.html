@@ -15,6 +15,10 @@
         <button id="skip-intro" class="pixel-btn">PULAR INTRO</button>
     </div>
 
+    <div id="continue-screen" class="screen hidden">
+        <div class="continue-hint">Clique para continuar</div>
+    </div>
+
     <div id="main-menu" class="screen hidden">
         <div class="win-window main-menu-box">
             <header class="win-titlebar">
@@ -32,7 +36,7 @@
                     <img src="icon-gear.svg" alt="engrenagem"> <span>INSTRUCTIONS</span>
                 </button>
                 <button class="menu-item" id="btn-exit" type="button">
-                    <img src="icon-exit.svg" alt="porta"> <span>EXIT TO DOS</span>
+                    <img src="icon-exit.svg" alt="porta"> <span>EXIT</span>
                 </button>
             </nav>
         </div>
@@ -61,16 +65,6 @@
         </div>
     </div>
 
-    <div id="briefing-screen" class="screen hidden">
-        <div class="dossier">
-            <h1>CONFIDENCIAL: Voo Vitória - Brasília</h1>
-            <p><strong>Ameaça Detectada:</strong> Terrorista a bordo com detonador.</p>
-            <p><strong>Nossa Vantagem:</strong> A melhor equipe policial está no mesmo voo.</p>
-            <p><strong>Missão:</strong> Neutralizar a ameaça e desarmar a bomba sem NENHUMA baixa.</p>
-            <button id="btn-start-briefing">Entendido</button>
-        </div>
-    </div>
-
     <div id="master-screen" class="screen hidden">
         <header class="master-header">
             <h2>Painel de Controle do Mestre</h2>
@@ -78,8 +72,11 @@
                 <span id="master-mode">Rodada: G1</span>
                 <span id="master-timer">Tempo: 120s</span>
             </div>
-            <button id="btn-start-round">Iniciar Rodada</button>
-            <button id="btn-next-mode">Avançar Modo</button>
+            <div class="master-controls">
+                <button id="btn-start-round">Iniciar Rodada</button>
+                <button id="btn-next-mode">Avançar Modo</button>
+                <button id="btn-end-game">Sair do jogo</button>
+            </div>
         </header>
         <div id="master-dashboard" class="dashboard">
             </div>
