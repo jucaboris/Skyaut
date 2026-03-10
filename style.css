@@ -162,15 +162,6 @@ button:disabled, .option-btn:disabled {
     padding: 0 10px 10px 10px;
 }
 
-/* Painel de status (Rodada/Tempo) */
-.status-bar {
-    display: flex;
-    gap: 15px;
-    font-size: 12px;
-    color: white;
-    padding-right: 10px;
-}
-
 /* Ajustes de Header */
 .master-header, .player-header {
     flex-direction: column;
@@ -217,6 +208,150 @@ button:disabled, .option-btn:disabled {
     z-index: 1000;
 }
 
+/* --- Intro + Main Menu --- */
+.full-screen-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: black;
+    z-index: 2000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#intro-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+#main-menu {
+    background-image: url('menu-background-landscape.png');
+    background-size: cover;
+    background-position: center;
+}
+
+@media (orientation: portrait) {
+    #main-menu {
+        background-image: url('menu-background-portrait.png');
+    }
+}
+
+.main-menu-box {
+    width: 320px;
+    background: #c0c0c0;
+    border: 3px solid;
+    border-color: #ffffff #808080 #808080 #ffffff;
+}
+
+.win-titlebar {
+    background: #000080;
+    color: white;
+    padding: 3px 6px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+}
+
+.win-controls {
+    display: flex;
+    gap: 4px;
+}
+
+.win-btn-small {
+    min-width: 18px;
+    padding: 2px 4px;
+    font-size: 10px;
+}
+
+.menu-options {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.menu-item {
+    background: none;
+    border: none;
+    color: black;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    font-family: 'Pixelated', monospace;
+    font-size: 18px;
+    cursor: pointer;
+    text-align: left;
+    padding: 5px;
+}
+
+.menu-item:hover {
+    background: #000080;
+    color: white;
+}
+
+.menu-item img {
+    width: 32px;
+    height: 32px;
+    image-rendering: pixelated;
+}
+
+#skip-intro {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    opacity: 0.6;
+}
+
+
+
+.status-bar {
+    margin: 10px auto;
+    width: fit-content;
+    min-width: 220px;
+    background: #111;
+    border: 3px inset #666;
+    color: #d7d7d7;
+    padding: 4px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    text-transform: uppercase;
+}
+
+.status-bar span {
+    line-height: 1.1;
+}
+
+#master-timer,
+#player-timer {
+    color: #7dff80;
+    font-size: 18px;
+    letter-spacing: 1px;
+}
+
+.instructions-window {
+    max-width: 760px;
+    width: min(92vw, 760px);
+}
+
+.instructions-body {
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: 12px 15px 4px;
+}
+
+.instructions-body p {
+    padding: 0;
+    margin: 0 0 10px;
+}
+
+#btn-close-instructions {
+    margin: 10px 15px 15px;
+}
 /* Ajuste específico para o modal parecer uma janela */
 .modal-content {
     max-width: 400px;
