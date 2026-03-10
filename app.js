@@ -73,9 +73,11 @@ window.addEventListener('load', () => {
 });
 
 introVideo.onended = showMainMenu;
+introVideo.onerror = showMainMenu;
 document.getElementById('skip-intro').onclick = showMainMenu;
 
 function showMainMenu() {
+    if (introContainer.classList.contains('hidden')) return;
     introContainer.classList.add('hidden');
     mainMenu.classList.remove('hidden');
 }
@@ -203,15 +205,18 @@ function submitVote(actionKey, optionId) {
 let timerInterval;
 
 function initMaster() {
-    // Estado inicial padrão se não existir
-    set(ref(db, 'gameState'), {
-        phase: 'IDLE',
-        mode: 'G1',
-        timer: 0,
-        votes: {}
-    });
-
     onValue(ref(db, 'gameState'), (snapshot) => {
+        if (!snapshot.exists()) {
+            // Estado inicial padrão apenas quando o jogo ainda não existe
+            set(ref(db, 'gameState'), {
+                phase: 'IDLE',
+                mode: 'G1',
+                timer: 0,
+                votes: {}
+            });
+            return;
+        }
+
         currentState = snapshot.val();
         if(!currentState) return;
         
@@ -246,13 +251,18 @@ function startRound() {
 }
 
 function advanceMode() {
-    let nextMode = 'G1';
+    let nextMode = currentState.mode;
+    let nextPhase = 'IDLE';
+
     if (currentState.mode === 'G1') nextMode = 'G2';
     else if (currentState.mode === 'G2') nextMode = 'G3';
-    else alert("Missão concluída com sucesso! Jogo finalizado.");
+    else {
+        nextPhase = 'END';
+        alert("Missão concluída com sucesso! Jogo finalizado.");
+    }
 
     clearInterval(timerInterval);
-    update(ref(db, 'gameState'), { phase: 'IDLE', mode: nextMode, timer: 0, votes: {} });
+    update(ref(db, 'gameState'), { phase: nextPhase, mode: nextMode, timer: 0, votes: {} });
 }
 
 function renderMasterUI() {
@@ -302,6 +312,7 @@ function renderMasterUI() {
 
 function resolveAction(actionKey, optionData) {
     if (!optionData.correct) {
+        update(ref(db, 'gameState'), { phase: 'END', timer: 0 });
         showResultModal("FALHA CRÍTICA", optionData.failMsg, true);
     } else {
         alert("Ação executada com sucesso. Prossiga para as demais.");
@@ -315,9 +326,7 @@ function showResultModal(title, message, isFailure) {
     document.getElementById('result-message').innerText = message;
     const btnClose = document.getElementById('btn-close-result');
     
-    if (isFailure) {
-        btnClose.classList.remove('hidden');
-    }
+    btnClose.classList.toggle('hidden', !isFailure);
     
     document.getElementById('result-modal').classList.remove('hidden');
 }
