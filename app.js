@@ -68,7 +68,8 @@ function formatCountdown(totalSeconds) {
 // Inicialização
 window.addEventListener('load', () => {
     introVideo.play().catch(() => {
-        showMainMenu();
+        // Alguns navegadores podem bloquear autoplay mesmo com vídeo mutado.
+        // Mantemos a tela de introdução e deixamos o usuário iniciar/ignorar manualmente.
     });
 });
 
