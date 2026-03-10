@@ -7,7 +7,61 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="briefing-screen" class="screen">
+    <div id="intro-video-container" class="full-screen-container">
+        <video id="intro-video" width="100%" height="100%">
+            <source src="Edição_de_Vídeo_Sem_Título_e_Barra.mp4" type="video/mp4">
+            Seu navegador não suporta vídeos.
+        </video>
+        <button id="skip-intro" class="pixel-btn">PULAR INTRO</button>
+    </div>
+
+    <div id="main-menu" class="screen hidden">
+        <div class="win-window main-menu-box">
+            <header class="win-titlebar">
+                <span>MAIN MENU</span>
+                <div class="win-controls">
+                    <button class="win-btn-small" type="button">-</button>
+                    <button class="win-btn-small" type="button">x</button>
+                </div>
+            </header>
+            <nav class="menu-options">
+                <button class="menu-item" id="btn-new-sim" type="button">
+                    <img src="icon-star.svg" alt="estrela"> <span>NEW SIMULATION</span>
+                </button>
+                <button class="menu-item" id="btn-instructions" type="button">
+                    <img src="icon-gear.svg" alt="engrenagem"> <span>INSTRUCTIONS</span>
+                </button>
+                <button class="menu-item" id="btn-exit" type="button">
+                    <img src="icon-exit.svg" alt="porta"> <span>EXIT TO DOS</span>
+                </button>
+            </nav>
+        </div>
+    </div>
+
+
+
+    <div id="instructions-modal" class="modal hidden">
+        <div class="modal-content dossier instructions-window">
+            <h2>📄 INSTRUÇÕES DE OPERAÇÃO: VOO 2026</h2>
+            <div class="instructions-body">
+                <p><strong>📑 CONTEXTO DA MISSÃO</strong><br>Um voo comercial de Vitória para Brasília foi interceptado. Um terrorista a bordo possui um detonador e planeja um ataque contra a Praça dos Três Poderes. Felizmente, a elite da polícia e uma tripulação altamente treinada estão a bordo. O alvo está instável; qualquer erro resultará na detonação imediata.</p>
+
+                <p><strong>🎮 DINÂMICA DO SIMULADOR</strong><br>A missão é dividida em 3 Rodadas Críticas (G1, G2 e G3), onde o tempo é seu maior inimigo:</p>
+                <p><strong>Rodada G1 (Centralizada):</strong> A decisão final cabe exclusivamente ao Comando. A equipe deve fornecer inteligência, mas apenas o líder executa a ação.</p>
+                <p><strong>Rodada G2 (Consultiva):</strong> O Comando deve ouvir os especialistas antes de agir. Cuidado: votos divergentes na equipe podem gerar conflitos e atrasos fatais.</p>
+                <p><strong>Rodada G3 (Especializada):</strong> Cada agente assume total responsabilidade por sua área. O Negociador cuida da crise, o Antibomba do explosivo, e assim por diante. Um erro individual compromete toda a aeronave.</p>
+
+                <p><strong>📂 INFORMAÇÕES CONFIDENCIAIS (FÍSICAS)</strong><br>Para tornar a experiência mais realista, cada participante receberá uma folha física de personagem.</p>
+                <p><em>Dica:</em> Leia sua folha com atenção. Ela contém dados técnicos e comportamentais que não aparecem na tela, essenciais para escolher a opção correta no painel digital.</p>
+
+                <p><strong>⚠️ REGRAS DE OURO</strong><br><strong>Sem Baixas:</strong> O sucesso só é alcançado com 0% de fatalidades.</p>
+                <p><strong>Cadeia de Eventos:</strong> As ações são interdependentes. Neutralizar o terrorista não adianta se a bomba não for desarmada a tempo.</p>
+            </div>
+            <button id="btn-close-instructions" type="button">Fechar</button>
+        </div>
+    </div>
+
+    <div id="briefing-screen" class="screen hidden">
         <div class="dossier">
             <h1>CONFIDENCIAL: Voo Vitória - Brasília</h1>
             <p><strong>Ameaça Detectada:</strong> Terrorista a bordo com detonador.</p>
