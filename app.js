@@ -35,9 +35,15 @@ const btnNewSim = document.getElementById('btn-new-sim');
 const instructionsModal = document.getElementById('instructions-modal');
 const btnInstructions = document.getElementById('btn-instructions');
 const btnCloseInstructions = document.getElementById('btn-close-instructions');
+const btnToggleMasterAudio = document.getElementById('btn-toggle-master-audio');
 
 // Game State
 let currentState = null;
+const MASTER_AUDIO_PREF_KEY = 'skyaut-master-audio-enabled';
+const masterAudio = new Audio('trilha.mp3');
+masterAudio.loop = true;
+masterAudio.volume = 0.35;
+let isMasterAudioEnabled = false;
 
 function getOrCreateVoterId(role) {
     const storageKey = `skyaut-voter-id-${role}`;
@@ -128,6 +134,7 @@ function showContinueScreen() {
     masterScreen.classList.add('hidden');
     playerScreen.classList.add('hidden');
     continueScreen.classList.remove('hidden');
+    stopMasterAudio();
 }
 
 // --- LÓGICA DO JOGADOR ---
@@ -212,6 +219,8 @@ function submitVote(actionKey, optionId) {
 let timerInterval;
 
 function initMaster() {
+    setupMasterAudio();
+
     onValue(ref(db, 'gameState'), (snapshot) => {
         if (!snapshot.exists()) {
             // Estado inicial padrão apenas quando o jogo ainda não existe
@@ -239,15 +248,60 @@ function initMaster() {
     document.getElementById('btn-start-round').onclick = startRound;
     document.getElementById('btn-next-mode').onclick = advanceMode;
     document.getElementById('btn-end-game').onclick = endGame;
+    btnToggleMasterAudio.onclick = toggleMasterAudio;
     document.getElementById('btn-close-result').onclick = () => {
         document.getElementById('result-modal').classList.add('hidden');
         advanceMode();
     };
 }
 
+function setupMasterAudio() {
+    if (!isMaster) return;
+    const savedPreference = localStorage.getItem(MASTER_AUDIO_PREF_KEY);
+    isMasterAudioEnabled = savedPreference !== 'false';
+    updateMasterAudioButtonLabel();
+
+    if (isMasterAudioEnabled) {
+        startMasterAudio();
+    }
+}
+
+function startMasterAudio() {
+    if (!isMaster || !isMasterAudioEnabled) return;
+    masterAudio.play().catch(() => {
+        // Pode falhar sem gesto explícito em alguns navegadores.
+    });
+}
+
+function stopMasterAudio() {
+    if (!isMaster) return;
+    masterAudio.pause();
+    masterAudio.currentTime = 0;
+}
+
+function updateMasterAudioButtonLabel() {
+    if (!btnToggleMasterAudio) return;
+    btnToggleMasterAudio.innerText = isMasterAudioEnabled ? 'Som: Ligado' : 'Som: Desligado';
+}
+
+function toggleMasterAudio() {
+    if (!isMaster) return;
+    isMasterAudioEnabled = !isMasterAudioEnabled;
+    localStorage.setItem(MASTER_AUDIO_PREF_KEY, String(isMasterAudioEnabled));
+    updateMasterAudioButtonLabel();
+
+    if (isMasterAudioEnabled) {
+        startMasterAudio();
+        return;
+    }
+
+    stopMasterAudio();
+}
+
 function endGame() {
     clearInterval(timerInterval);
     update(ref(db, 'gameState'), { phase: 'IDLE', mode: 'G1', timer: 0, votes: {} });
+    stopMasterAudio();
     showMainMenuFromGame();
 }
 
