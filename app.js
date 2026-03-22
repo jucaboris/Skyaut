@@ -335,7 +335,7 @@ function resolveAction(actionKey, optionData) {
         update(ref(db, 'gameState'), { phase: 'END', timer: 0 });
         showResultModal("FALHA CRÍTICA", optionData.failMsg, true);
     } else {
-        alert("Ação executada com sucesso. Prossiga para as demais.");
+        alert(optionData.successMsg || "Ação executada com sucesso. Prossiga para as demais.");
         // A lógica de vitória total exigiria rastrear se as 4 corretas foram clicadas.
         // Para simplificar: O Mestre clica na correta e segue. Se errar, falha instantânea.
     }
