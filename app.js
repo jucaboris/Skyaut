@@ -53,9 +53,11 @@ const MODE_LABELS = {
     G2: 'Livre',
     G3: 'Descentralizado'
 };
-const backgroundAudio = new Audio('Edição_de_Vídeo_Sem_Título_e_Barra.mp4');
+const MENU_AUDIO_VOLUME = 0.5;
+const GAME_AUDIO_VOLUME = MENU_AUDIO_VOLUME * 0.5;
+const backgroundAudio = new Audio('trilha.mp3');
 backgroundAudio.loop = true;
-backgroundAudio.volume = 0.35;
+backgroundAudio.volume = MENU_AUDIO_VOLUME;
 backgroundAudio.preload = 'auto';
 let isMasterAudioEnabled = false;
 let hasTriggeredVictoryCinematic = false;
@@ -67,6 +69,7 @@ const INTRO_PLAYLIST = [
 const CRITICAL_ASSETS = [
     'ILA ENTRANCE.mp4',
     'Edição_de_Vídeo_Sem_Título_e_Barra.mp4',
+    'trilha.mp3',
     'Avião_Explodindo_Vídeo_Pronto.mp4',
     'VICTORY.mp4',
     'menu-background-landscape.png',
@@ -131,10 +134,29 @@ function loadVideoAsset(src) {
     });
 }
 
+function loadAudioAsset(src) {
+    return new Promise((resolve) => {
+        const audio = new Audio();
+        const finish = () => {
+            audio.removeEventListener('canplaythrough', finish);
+            audio.removeEventListener('error', finish);
+            resolve();
+        };
+
+        audio.preload = 'auto';
+        audio.src = src;
+        audio.addEventListener('canplaythrough', finish, { once: true });
+        audio.addEventListener('error', finish, { once: true });
+    });
+}
+
 async function preloadCriticalAssets() {
-    const loadTasks = CRITICAL_ASSETS.map((asset) => (
-        asset.toLowerCase().endsWith('.mp4') ? loadVideoAsset(asset) : loadImageAsset(asset)
-    ));
+    const loadTasks = CRITICAL_ASSETS.map((asset) => {
+        const lowerAsset = asset.toLowerCase();
+        if (lowerAsset.endsWith('.mp4')) return loadVideoAsset(asset);
+        if (lowerAsset.endsWith('.mp3')) return loadAudioAsset(asset);
+        return loadImageAsset(asset);
+    });
 
     await Promise.all(loadTasks);
     await new Promise((resolve) => setTimeout(resolve, 600));
@@ -158,10 +180,16 @@ continueScreen.onclick = openMainMenu;
 
 function ensureBackgroundAudio() {
     if (!isMasterAudioEnabled) return;
+    backgroundAudio.volume = getBackgroundAudioVolume();
 
     backgroundAudio.play().catch(() => {
         // Pode falhar sem interação do usuário em alguns navegadores.
     });
+}
+
+function getBackgroundAudioVolume() {
+    const isInGame = !mainMenu.classList.contains('hidden') ? false : (!masterScreen.classList.contains('hidden') || !playerScreen.classList.contains('hidden'));
+    return isInGame ? GAME_AUDIO_VOLUME : MENU_AUDIO_VOLUME;
 }
 
 function playIntroByIndex(index) {
@@ -172,7 +200,7 @@ function playIntroByIndex(index) {
 
     currentIntroIndex = index;
     introVideo.src = INTRO_PLAYLIST[currentIntroIndex];
-    introVideo.muted = currentIntroIndex === 0;
+    introVideo.muted = false;
     introVideo.load();
     introVideo.play().catch(() => {
         // Alguns navegadores podem bloquear autoplay mesmo com vídeo mutado.
@@ -376,10 +404,6 @@ function initMaster() {
     document.getElementById('btn-next-mode').onclick = advanceMode;
     document.getElementById('btn-end-game').onclick = endGame;
     btnToggleMasterAudio.onclick = toggleMasterAudio;
-    document.getElementById('btn-close-result').onclick = () => {
-        document.getElementById('result-modal').classList.add('hidden');
-        advanceMode();
-    };
 }
 
 function setupMasterAudio() {
@@ -435,6 +459,7 @@ function showMainMenuFromGame() {
     masterScreen.classList.add('hidden');
     playerScreen.classList.add('hidden');
     mainMenu.classList.remove('hidden');
+    ensureBackgroundAudio();
 }
 
 function startRound() {
@@ -582,7 +607,15 @@ function finishVictoryCinematic() {
         resetVictoryVideoPlayback();
         document.body.classList.remove('app-frozen');
         update(ref(db, 'gameState'), { phase: 'END', timer: 0 });
-        showResultModal('SUCESSO TOTAL', 'Missão concluída com sucesso no round Descentralizado.', false);
+        showResultModal({
+            title: 'SUCESSO TOTAL',
+            message: 'Missão concluída com sucesso no round Descentralizado.',
+            buttonText: 'Voltar ao menu',
+            onButtonClick: () => {
+                document.getElementById('result-modal').classList.add('hidden');
+                showMainMenuFromGame();
+            }
+        });
     }, VICTORY_FADE_MS);
 }
 
@@ -611,7 +644,15 @@ function finishFailureCinematic(message) {
         failureCinematic.classList.add('darkened');
         resetFailureVideoPlayback();
         document.body.classList.remove('app-frozen');
-        showResultModal('FALHA CRÍTICA', message, true);
+        showResultModal({
+            title: 'FALHA CRÍTICA',
+            message,
+            buttonText: 'Fechar e Tentar Novamente',
+            onButtonClick: () => {
+                document.getElementById('result-modal').classList.add('hidden');
+                advanceMode();
+            }
+        });
     }, FAILURE_FADE_MS);
 }
 
@@ -643,12 +684,13 @@ function resetFailureCinematicState() {
     resetFailureVideoPlayback();
 }
 
-function showResultModal(title, message, isFailure) {
+function showResultModal({ title, message, buttonText, onButtonClick }) {
     document.getElementById('result-title').innerText = title;
     document.getElementById('result-message').innerText = message;
     const btnClose = document.getElementById('btn-close-result');
-
-    btnClose.classList.toggle('hidden', !isFailure);
+    btnClose.innerText = buttonText;
+    btnClose.onclick = onButtonClick;
+    btnClose.classList.remove('hidden');
 
     document.getElementById('result-modal').classList.remove('hidden');
 }
