@@ -263,6 +263,35 @@ button:disabled, .option-btn:disabled {
     object-fit: cover;
 }
 
+#victory-cinematic {
+    z-index: 3000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 400ms ease;
+}
+
+#victory-cinematic.active {
+    opacity: 1;
+}
+
+#victory-cinematic.fade-out {
+    opacity: 0;
+}
+
+#victory-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+body.app-frozen {
+    overflow: hidden;
+}
+
+body.app-frozen * {
+    pointer-events: none !important;
+}
+
 #continue-screen,
 #main-menu {
     background-image: url('menu-background-landscape.png');
