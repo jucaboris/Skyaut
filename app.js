@@ -22,6 +22,7 @@ const playerRole = urlParams.get('role');
 const voterId = !isMaster && playerRole ? getOrCreateVoterId(playerRole) : null;
 
 // DOM Elements
+const loadingScreen = document.getElementById('loading-screen');
 const introVideo = document.getElementById('intro-video');
 const introContainer = document.getElementById('intro-video-container');
 const continueScreen = document.getElementById('continue-screen');
@@ -30,6 +31,8 @@ const masterScreen = document.getElementById('master-screen');
 const playerScreen = document.getElementById('player-screen');
 const victoryCinematic = document.getElementById('victory-cinematic');
 const victoryVideo = document.getElementById('victory-video');
+const failureCinematic = document.getElementById('failure-cinematic');
+const failureVideo = document.getElementById('failure-video');
 const playerDashboard = document.getElementById('player-dashboard');
 const masterDashboard = document.getElementById('master-dashboard');
 const playerWarning = document.getElementById('player-warning');
@@ -44,19 +47,32 @@ let currentState = null;
 const MASTER_AUDIO_PREF_KEY = 'skyaut-master-audio-enabled';
 const VICTORY_FREEZE_MS = 150;
 const VICTORY_FADE_MS = 700;
+const FAILURE_FADE_MS = 700;
 const MODE_LABELS = {
     G1: 'Centralizado',
     G2: 'Livre',
     G3: 'Descentralizado'
 };
-const masterAudio = new Audio('trilha.mp3');
-masterAudio.loop = true;
-masterAudio.volume = 0.35;
+const backgroundAudio = new Audio('Edição_de_Vídeo_Sem_Título_e_Barra.mp4');
+backgroundAudio.loop = true;
+backgroundAudio.volume = 0.35;
+backgroundAudio.preload = 'auto';
 let isMasterAudioEnabled = false;
 let hasTriggeredVictoryCinematic = false;
+let hasTriggeredFailureCinematic = false;
 const INTRO_PLAYLIST = [
     'ILA ENTRANCE.mp4',
     'Edição_de_Vídeo_Sem_Título_e_Barra.mp4'
+];
+const CRITICAL_ASSETS = [
+    'ILA ENTRANCE.mp4',
+    'Edição_de_Vídeo_Sem_Título_e_Barra.mp4',
+    'Avião_Explodindo_Vídeo_Pronto.mp4',
+    'VICTORY.mp4',
+    'menu-background-landscape.png',
+    'menu-background-portrait.png',
+    'background-landscape.png',
+    'background-portrait.png'
 ];
 let currentIntroIndex = 0;
 
@@ -90,15 +106,63 @@ function formatMode(mode) {
     return MODE_LABELS[mode] || mode;
 }
 
+function loadImageAsset(src) {
+    return new Promise((resolve) => {
+        const image = new Image();
+        image.onload = resolve;
+        image.onerror = resolve;
+        image.src = src;
+    });
+}
+
+function loadVideoAsset(src) {
+    return new Promise((resolve) => {
+        const video = document.createElement('video');
+        const finish = () => {
+            video.removeEventListener('canplaythrough', finish);
+            video.removeEventListener('error', finish);
+            resolve();
+        };
+
+        video.preload = 'auto';
+        video.src = src;
+        video.addEventListener('canplaythrough', finish, { once: true });
+        video.addEventListener('error', finish, { once: true });
+    });
+}
+
+async function preloadCriticalAssets() {
+    const loadTasks = CRITICAL_ASSETS.map((asset) => (
+        asset.toLowerCase().endsWith('.mp4') ? loadVideoAsset(asset) : loadImageAsset(asset)
+    ));
+
+    await Promise.all(loadTasks);
+    await new Promise((resolve) => setTimeout(resolve, 600));
+}
+
+async function bootstrapApplication() {
+    await preloadCriticalAssets();
+    loadingScreen.classList.add('hidden');
+    playIntroByIndex(0);
+}
+
 // Inicialização
 window.addEventListener('load', () => {
-    playIntroByIndex(0);
+    bootstrapApplication();
 });
 
 introVideo.onended = handleIntroEnded;
 introVideo.onerror = handleIntroError;
 document.getElementById('skip-intro').onclick = showMainMenu;
 continueScreen.onclick = openMainMenu;
+
+function ensureBackgroundAudio() {
+    if (!isMasterAudioEnabled) return;
+
+    backgroundAudio.play().catch(() => {
+        // Pode falhar sem interação do usuário em alguns navegadores.
+    });
+}
 
 function playIntroByIndex(index) {
     if (!INTRO_PLAYLIST[index]) {
@@ -108,11 +172,16 @@ function playIntroByIndex(index) {
 
     currentIntroIndex = index;
     introVideo.src = INTRO_PLAYLIST[currentIntroIndex];
+    introVideo.muted = currentIntroIndex === 0;
     introVideo.load();
     introVideo.play().catch(() => {
         // Alguns navegadores podem bloquear autoplay mesmo com vídeo mutado.
         // Mantemos a tela de introdução e deixamos o usuário iniciar/ignorar manualmente.
     });
+
+    if (currentIntroIndex > 0) {
+        ensureBackgroundAudio();
+    }
 }
 
 function handleIntroEnded() {
@@ -144,10 +213,13 @@ function showMainMenu() {
 function openMainMenu() {
     continueScreen.classList.add('hidden');
     mainMenu.classList.remove('hidden');
+    ensureBackgroundAudio();
 }
 
 btnNewSim.onclick = () => {
     mainMenu.classList.add('hidden');
+    ensureBackgroundAudio();
+
     if (isMaster) {
         masterScreen.classList.remove('hidden');
         initMaster();
@@ -185,7 +257,10 @@ function showContinueScreen() {
     masterScreen.classList.add('hidden');
     playerScreen.classList.add('hidden');
     continueScreen.classList.remove('hidden');
-    stopMasterAudio();
+
+    if (!isMasterAudioEnabled) {
+        stopBackgroundAudio();
+    }
 }
 
 // --- LÓGICA DO JOGADOR ---
@@ -202,7 +277,7 @@ function renderPlayerUI() {
     document.getElementById('player-mode').innerText = `Rodada: ${formatMode(currentState.mode)}`;
     const timerLabel = currentState.phase === 'VOTING' ? formatCountdown(currentState.timer) : '00:00';
     document.getElementById('player-timer').innerText = `TEMPO RESTANTE: ${timerLabel}`;
-    
+
     playerDashboard.innerHTML = '';
     playerWarning.classList.add('hidden');
 
@@ -228,12 +303,12 @@ function renderPlayerUI() {
         const card = document.createElement('div');
         card.className = 'action-card';
         card.innerHTML = `<h3>${actionData.label}</h3>`;
-        
+
         const grid = document.createElement('div');
         grid.className = 'options-grid';
 
         // Bloqueia os botões baseados na fase e nas regras de rodada
-        const isDisabled = !isVotingPhase || 
+        const isDisabled = !isVotingPhase ||
                            (currentState.mode === 'G1' && playerRole !== 'comando');
 
         actionData.options.forEach(opt => {
@@ -241,7 +316,7 @@ function renderPlayerUI() {
             btn.className = 'option-btn';
             btn.innerText = opt.text;
             btn.disabled = isDisabled;
-            
+
             // Marca se já votou
             const myVote = currentState.votes && currentState.votes[actionKey] ? currentState.votes[actionKey][voterId] : null;
             if (getVoteOptionId(myVote) === opt.id) {
@@ -287,13 +362,13 @@ function initMaster() {
 
         currentState = snapshot.val();
         if(!currentState) return;
-        
+
         document.getElementById('master-mode').innerText = `Rodada: ${formatMode(currentState.mode)}`;
         const timerText = currentState.phase === 'VOTING' ? formatCountdown(currentState.timer) : '00:00';
         document.getElementById('master-timer').innerText = `TEMPO RESTANTE: ${timerText}`;
 
         if (currentState.phase !== 'VOTING') clearInterval(timerInterval);
-        
+
         renderMasterUI();
     });
 
@@ -308,27 +383,24 @@ function initMaster() {
 }
 
 function setupMasterAudio() {
-    if (!isMaster) return;
+    if (!isMaster) {
+        isMasterAudioEnabled = true;
+        ensureBackgroundAudio();
+        return;
+    }
+
     const savedPreference = localStorage.getItem(MASTER_AUDIO_PREF_KEY);
     isMasterAudioEnabled = savedPreference !== 'false';
     updateMasterAudioButtonLabel();
 
     if (isMasterAudioEnabled) {
-        startMasterAudio();
+        ensureBackgroundAudio();
     }
 }
 
-function startMasterAudio() {
-    if (!isMaster || !isMasterAudioEnabled) return;
-    masterAudio.play().catch(() => {
-        // Pode falhar sem gesto explícito em alguns navegadores.
-    });
-}
-
-function stopMasterAudio() {
-    if (!isMaster) return;
-    masterAudio.pause();
-    masterAudio.currentTime = 0;
+function stopBackgroundAudio() {
+    backgroundAudio.pause();
+    backgroundAudio.currentTime = 0;
 }
 
 function updateMasterAudioButtonLabel() {
@@ -343,18 +415,19 @@ function toggleMasterAudio() {
     updateMasterAudioButtonLabel();
 
     if (isMasterAudioEnabled) {
-        startMasterAudio();
+        ensureBackgroundAudio();
         return;
     }
 
-    stopMasterAudio();
+    stopBackgroundAudio();
 }
 
 function endGame() {
     clearInterval(timerInterval);
     update(ref(db, 'gameState'), { phase: 'IDLE', mode: 'G2', timer: 0, votes: {}, resolvedActions: {} });
-    stopMasterAudio();
+    stopBackgroundAudio();
     resetVictoryCinematicState();
+    resetFailureCinematicState();
     showMainMenuFromGame();
 }
 
@@ -366,7 +439,9 @@ function showMainMenuFromGame() {
 
 function startRound() {
     hasTriggeredVictoryCinematic = false;
+    hasTriggeredFailureCinematic = false;
     resetVictoryCinematicState();
+    resetFailureCinematicState();
     update(ref(db, 'gameState'), { phase: 'VOTING', timer: 120, votes: {}, resolvedActions: {} });
     clearInterval(timerInterval);
     timerInterval = setInterval(() => {
@@ -392,19 +467,21 @@ function advanceMode() {
 
     clearInterval(timerInterval);
     hasTriggeredVictoryCinematic = false;
+    hasTriggeredFailureCinematic = false;
     resetVictoryCinematicState();
+    resetFailureCinematicState();
     update(ref(db, 'gameState'), { phase: nextPhase, mode: nextMode, timer: 0, votes: {}, resolvedActions: {} });
 }
 
 function renderMasterUI() {
     masterDashboard.innerHTML = '';
-    
+
     Object.keys(GAME_DATA).forEach(actionKey => {
         const actionData = GAME_DATA[actionKey];
         const card = document.createElement('div');
         card.className = 'action-card';
         card.innerHTML = `<h3>${actionData.label}</h3>`;
-        
+
         // Verifica conflitos no modo G2
         let votesForThisAction = currentState.votes ? currentState.votes[actionKey] : null;
         if (currentState.mode === 'G2' && votesForThisAction) {
@@ -420,7 +497,7 @@ function renderMasterUI() {
         actionData.options.forEach(opt => {
             const btn = document.createElement('button');
             btn.className = 'option-btn';
-            
+
             // Conta os votos para esta opção
             let voteCount = 0;
             if (votesForThisAction) {
@@ -428,11 +505,11 @@ function renderMasterUI() {
                     if(getVoteOptionId(v) === opt.id) voteCount++;
                 });
             }
-            
+
             btn.innerText = `${opt.text} (${voteCount} votos)`;
             const isActionResolved = Boolean(currentState.resolvedActions && currentState.resolvedActions[actionKey]);
             btn.disabled = isActionResolved;
-            
+
             // Apenas o Mestre pode "Executar" a ação
             btn.onclick = () => resolveAction(actionKey, opt);
             grid.appendChild(btn);
@@ -452,7 +529,7 @@ function resolveAction(actionKey, optionData) {
 
     if (!optionData.correct) {
         update(ref(db, 'gameState'), { phase: 'END', timer: 0 });
-        showResultModal("FALHA CRÍTICA", optionData.failMsg, true);
+        playFailureCinematic(optionData.failMsg);
     } else {
         const nextResolvedActions = {
             ...(currentState.resolvedActions || {}),
@@ -509,11 +586,47 @@ function finishVictoryCinematic() {
     }, VICTORY_FADE_MS);
 }
 
+function playFailureCinematic(message) {
+    if (hasTriggeredFailureCinematic) return;
+    hasTriggeredFailureCinematic = true;
+    document.body.classList.add('app-frozen');
+
+    failureCinematic.classList.remove('hidden');
+    failureCinematic.classList.remove('fade-out', 'darkened');
+    requestAnimationFrame(() => {
+        failureCinematic.classList.add('active');
+    });
+
+    failureVideo.currentTime = 0;
+    failureVideo.onended = () => finishFailureCinematic(message);
+    failureVideo.onerror = () => finishFailureCinematic(message);
+    failureVideo.play().catch(() => {
+        finishFailureCinematic(message);
+    });
+}
+
+function finishFailureCinematic(message) {
+    failureCinematic.classList.add('fade-out');
+    setTimeout(() => {
+        failureCinematic.classList.add('darkened');
+        resetFailureVideoPlayback();
+        document.body.classList.remove('app-frozen');
+        showResultModal('FALHA CRÍTICA', message, true);
+    }, FAILURE_FADE_MS);
+}
+
 function resetVictoryVideoPlayback() {
     victoryVideo.pause();
     victoryVideo.currentTime = 0;
     victoryVideo.onended = null;
     victoryVideo.onerror = null;
+}
+
+function resetFailureVideoPlayback() {
+    failureVideo.pause();
+    failureVideo.currentTime = 0;
+    failureVideo.onended = null;
+    failureVideo.onerror = null;
 }
 
 function resetVictoryCinematicState() {
@@ -523,12 +636,19 @@ function resetVictoryCinematicState() {
     resetVictoryVideoPlayback();
 }
 
+function resetFailureCinematicState() {
+    document.body.classList.remove('app-frozen');
+    failureCinematic.classList.add('hidden');
+    failureCinematic.classList.remove('active', 'fade-out', 'darkened');
+    resetFailureVideoPlayback();
+}
+
 function showResultModal(title, message, isFailure) {
     document.getElementById('result-title').innerText = title;
     document.getElementById('result-message').innerText = message;
     const btnClose = document.getElementById('btn-close-result');
-    
+
     btnClose.classList.toggle('hidden', !isFailure);
-    
+
     document.getElementById('result-modal').classList.remove('hidden');
 }

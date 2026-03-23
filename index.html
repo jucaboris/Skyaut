@@ -7,6 +7,14 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div id="loading-screen" class="loading-screen">
+        <div class="loading-content">
+            <h1>CARREGANDO MISSÃO...</h1>
+            <p>Aguarde enquanto os vídeos e recursos são preparados.</p>
+            <div class="loading-bar" aria-hidden="true"><span></span></div>
+        </div>
+    </div>
+
     <div id="intro-video-container" class="full-screen-container">
         <video id="intro-video" width="100%" height="100%" autoplay muted playsinline preload="auto">
             <source src="ILA ENTRANCE.mp4" type="video/mp4">
@@ -107,6 +115,13 @@
     <div id="victory-cinematic" class="full-screen-container hidden">
         <video id="victory-video" width="100%" height="100%" playsinline preload="auto">
             <source src="VICTORY.mp4" type="video/mp4">
+            Seu navegador não suporta vídeos.
+        </video>
+    </div>
+
+    <div id="failure-cinematic" class="full-screen-container hidden">
+        <video id="failure-video" width="100%" height="100%" playsinline preload="auto">
+            <source src="Avião_Explodindo_Vídeo_Pronto.mp4" type="video/mp4">
             Seu navegador não suporta vídeos.
         </video>
     </div>
