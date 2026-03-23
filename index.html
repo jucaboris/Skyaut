@@ -10,8 +10,10 @@
     <div id="loading-screen" class="loading-screen">
         <div class="loading-content">
             <h1>CARREGANDO MISSÃO...</h1>
-            <p>Aguarde enquanto os vídeos e recursos são preparados.</p>
-            <div class="loading-bar" aria-hidden="true"><span></span></div>
+            <p id="loading-status">Aguarde enquanto os vídeos e recursos são preparados.</p>
+            <div class="loading-bar" aria-hidden="true"><span id="loading-progress-fill"></span></div>
+            <div id="loading-percentage" class="loading-percentage">0%</div>
+            <button id="btn-start-after-loading" class="hidden" type="button">INICIAR MISSÃO</button>
         </div>
     </div>
 

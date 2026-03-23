@@ -23,6 +23,10 @@ const voterId = !isMaster && playerRole ? getOrCreateVoterId(playerRole) : null;
 
 // DOM Elements
 const loadingScreen = document.getElementById('loading-screen');
+const loadingStatus = document.getElementById('loading-status');
+const loadingProgressFill = document.getElementById('loading-progress-fill');
+const loadingPercentage = document.getElementById('loading-percentage');
+const btnStartAfterLoading = document.getElementById('btn-start-after-loading');
 const introVideo = document.getElementById('intro-video');
 const introContainer = document.getElementById('intro-video-container');
 const continueScreen = document.getElementById('continue-screen');
@@ -77,7 +81,9 @@ const CRITICAL_ASSETS = [
     'background-landscape.png',
     'background-portrait.png'
 ];
+const PRELOAD_CACHE_KEY = 'skyaut-critical-assets-loaded-v2';
 let currentIntroIndex = 0;
+let loadingCompleted = false;
 
 function getOrCreateVoterId(role) {
     const storageKey = `skyaut-voter-id-${role}`;
@@ -150,29 +156,93 @@ function loadAudioAsset(src) {
     });
 }
 
+function updateLoadingProgress(percentage, message) {
+    const safePercentage = Math.max(0, Math.min(100, Math.round(percentage)));
+    loadingProgressFill.style.width = `${safePercentage}%`;
+    loadingPercentage.innerText = `${safePercentage}%`;
+    if (message) {
+        loadingStatus.innerText = message;
+    }
+}
+
+async function animateProgress(toPercentage, durationMs, message) {
+    const current = Number(loadingProgressFill.style.width.replace('%', '')) || 0;
+    const target = Math.max(current, Math.min(100, Math.round(toPercentage)));
+    const distance = target - current;
+    if (distance <= 0) {
+        updateLoadingProgress(target, message);
+        return;
+    }
+
+    const steps = Math.max(1, Math.round(durationMs / 30));
+    for (let step = 1; step <= steps; step++) {
+        const nextValue = current + ((distance * step) / steps);
+        updateLoadingProgress(nextValue, message);
+        await new Promise((resolve) => setTimeout(resolve, Math.max(16, durationMs / steps)));
+    }
+}
+
+function hasPreloadCache() {
+    return localStorage.getItem(PRELOAD_CACHE_KEY) === 'ready';
+}
+
+function markPreloadCache() {
+    localStorage.setItem(PRELOAD_CACHE_KEY, 'ready');
+}
+
 async function preloadCriticalAssets() {
-    const loadTasks = CRITICAL_ASSETS.map((asset) => {
+    if (hasPreloadCache()) {
+        await animateProgress(100, 420, 'Recursos locais encontrados. Pronto para iniciar.');
+        return;
+    }
+
+    updateLoadingProgress(0, 'Preparando recursos da missão...');
+    let completedAssets = 0;
+    const totalAssets = CRITICAL_ASSETS.length;
+
+    const loadTasks = CRITICAL_ASSETS.map(async (asset) => {
         const lowerAsset = asset.toLowerCase();
-        if (lowerAsset.endsWith('.mp4')) return loadVideoAsset(asset);
-        if (lowerAsset.endsWith('.mp3')) return loadAudioAsset(asset);
-        return loadImageAsset(asset);
+
+        if (lowerAsset.endsWith('.mp4')) {
+            await loadVideoAsset(asset);
+        } else if (lowerAsset.endsWith('.mp3')) {
+            await loadAudioAsset(asset);
+        } else {
+            await loadImageAsset(asset);
+        }
+
+        completedAssets += 1;
+        updateLoadingProgress((completedAssets / totalAssets) * 100, `Carregando recursos... (${completedAssets}/${totalAssets})`);
     });
 
     await Promise.all(loadTasks);
-    await new Promise((resolve) => setTimeout(resolve, 600));
+    markPreloadCache();
+}
+
+function unlockExperienceStart() {
+    loadingCompleted = true;
+    btnStartAfterLoading.classList.remove('hidden');
+    loadingStatus.innerText = 'Tudo pronto. Clique em INICIAR MISSÃO.';
+}
+
+function startExperience() {
+    if (!loadingCompleted) return;
+    loadingScreen.classList.add('hidden');
+    playIntroByIndex(0);
 }
 
 async function bootstrapApplication() {
     initializeAudioSettings();
+    updateLoadingProgress(0);
     await preloadCriticalAssets();
-    loadingScreen.classList.add('hidden');
-    playIntroByIndex(0);
+    unlockExperienceStart();
 }
 
 // Inicialização
 window.addEventListener('load', () => {
     bootstrapApplication();
 });
+btnStartAfterLoading.onclick = startExperience;
 
 introVideo.onended = handleIntroEnded;
 introVideo.onerror = handleIntroError;
