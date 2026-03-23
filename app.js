@@ -54,7 +54,7 @@ const MODE_LABELS = {
     G3: 'Descentralizado'
 };
 const MENU_AUDIO_VOLUME = 0.5;
-const GAME_AUDIO_VOLUME = MENU_AUDIO_VOLUME * 0.5;
+const GAME_AUDIO_VOLUME = MENU_AUDIO_VOLUME * 0.05;
 const backgroundAudio = new Audio('trilha.mp3');
 backgroundAudio.loop = true;
 backgroundAudio.volume = MENU_AUDIO_VOLUME;
@@ -163,6 +163,7 @@ async function preloadCriticalAssets() {
 }
 
 async function bootstrapApplication() {
+    initializeAudioSettings();
     await preloadCriticalAssets();
     loadingScreen.classList.add('hidden');
     playIntroByIndex(0);
@@ -175,8 +176,23 @@ window.addEventListener('load', () => {
 
 introVideo.onended = handleIntroEnded;
 introVideo.onerror = handleIntroError;
-document.getElementById('skip-intro').onclick = showMainMenu;
+document.getElementById('skip-intro').onclick = skipCurrentIntroSegment;
 continueScreen.onclick = openMainMenu;
+
+function initializeAudioSettings() {
+    if (!isMaster) {
+        isMasterAudioEnabled = true;
+        return;
+    }
+
+    const savedPreference = localStorage.getItem(MASTER_AUDIO_PREF_KEY);
+    isMasterAudioEnabled = savedPreference !== 'false';
+}
+
+function skipCurrentIntroSegment() {
+    introVideo.pause();
+    handleIntroEnded();
+}
 
 function ensureBackgroundAudio() {
     if (!isMasterAudioEnabled) return;
@@ -203,8 +219,12 @@ function playIntroByIndex(index) {
     introVideo.muted = false;
     introVideo.load();
     introVideo.play().catch(() => {
-        // Alguns navegadores podem bloquear autoplay mesmo com vídeo mutado.
-        // Mantemos a tela de introdução e deixamos o usuário iniciar/ignorar manualmente.
+        // Alguns navegadores bloqueiam autoplay com áudio.
+        // Tentamos reprodução silenciosa para garantir que o vídeo inicial seja exibido.
+        introVideo.muted = true;
+        introVideo.play().catch(() => {
+            // Mantemos a tela de introdução e deixamos o usuário iniciar/ignorar manualmente.
+        });
     });
 
     if (currentIntroIndex > 0) {
@@ -407,14 +427,6 @@ function initMaster() {
 }
 
 function setupMasterAudio() {
-    if (!isMaster) {
-        isMasterAudioEnabled = true;
-        ensureBackgroundAudio();
-        return;
-    }
-
-    const savedPreference = localStorage.getItem(MASTER_AUDIO_PREF_KEY);
-    isMasterAudioEnabled = savedPreference !== 'false';
     updateMasterAudioButtonLabel();
 
     if (isMasterAudioEnabled) {
