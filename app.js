@@ -40,6 +40,11 @@ const btnToggleMasterAudio = document.getElementById('btn-toggle-master-audio');
 // Game State
 let currentState = null;
 const MASTER_AUDIO_PREF_KEY = 'skyaut-master-audio-enabled';
+const MODE_LABELS = {
+    G1: 'Centralizado',
+    G2: 'Livre',
+    G3: 'Descentralizado'
+};
 const masterAudio = new Audio('trilha.mp3');
 masterAudio.loop = true;
 masterAudio.volume = 0.35;
@@ -69,6 +74,10 @@ function formatCountdown(totalSeconds) {
     const minutes = String(Math.floor(safeSeconds / 60)).padStart(2, '0');
     const seconds = String(safeSeconds % 60).padStart(2, '0');
     return `${minutes}:${seconds}`;
+}
+
+function formatMode(mode) {
+    return MODE_LABELS[mode] || mode;
 }
 
 // Inicialização
@@ -148,7 +157,7 @@ function initPlayer() {
 }
 
 function renderPlayerUI() {
-    document.getElementById('player-mode').innerText = `Rodada: ${currentState.mode}`;
+    document.getElementById('player-mode').innerText = `Rodada: ${formatMode(currentState.mode)}`;
     const timerLabel = currentState.phase === 'VOTING' ? formatCountdown(currentState.timer) : '00:00';
     document.getElementById('player-timer').innerText = `TEMPO RESTANTE: ${timerLabel}`;
     
@@ -226,7 +235,7 @@ function initMaster() {
             // Estado inicial padrão apenas quando o jogo ainda não existe
             set(ref(db, 'gameState'), {
                 phase: 'IDLE',
-                mode: 'G1',
+                mode: 'G2',
                 timer: 0,
                 votes: {}
             });
@@ -236,7 +245,7 @@ function initMaster() {
         currentState = snapshot.val();
         if(!currentState) return;
         
-        document.getElementById('master-mode').innerText = `Rodada: ${currentState.mode}`;
+        document.getElementById('master-mode').innerText = `Rodada: ${formatMode(currentState.mode)}`;
         const timerText = currentState.phase === 'VOTING' ? formatCountdown(currentState.timer) : '00:00';
         document.getElementById('master-timer').innerText = `TEMPO RESTANTE: ${timerText}`;
 
@@ -300,7 +309,7 @@ function toggleMasterAudio() {
 
 function endGame() {
     clearInterval(timerInterval);
-    update(ref(db, 'gameState'), { phase: 'IDLE', mode: 'G1', timer: 0, votes: {} });
+    update(ref(db, 'gameState'), { phase: 'IDLE', mode: 'G2', timer: 0, votes: {} });
     stopMasterAudio();
     showMainMenuFromGame();
 }
@@ -328,8 +337,8 @@ function advanceMode() {
     let nextMode = currentState.mode;
     let nextPhase = 'IDLE';
 
-    if (currentState.mode === 'G1') nextMode = 'G2';
-    else if (currentState.mode === 'G2') nextMode = 'G3';
+    if (currentState.mode === 'G2') nextMode = 'G1';
+    else if (currentState.mode === 'G1') nextMode = 'G3';
     else {
         nextPhase = 'END';
         alert("Missão concluída com sucesso! Jogo finalizado.");
