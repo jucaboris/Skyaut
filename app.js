@@ -28,6 +28,8 @@ const continueScreen = document.getElementById('continue-screen');
 const mainMenu = document.getElementById('main-menu');
 const masterScreen = document.getElementById('master-screen');
 const playerScreen = document.getElementById('player-screen');
+const victoryCinematic = document.getElementById('victory-cinematic');
+const victoryVideo = document.getElementById('victory-video');
 const playerDashboard = document.getElementById('player-dashboard');
 const masterDashboard = document.getElementById('master-dashboard');
 const playerWarning = document.getElementById('player-warning');
@@ -40,6 +42,8 @@ const btnToggleMasterAudio = document.getElementById('btn-toggle-master-audio');
 // Game State
 let currentState = null;
 const MASTER_AUDIO_PREF_KEY = 'skyaut-master-audio-enabled';
+const VICTORY_FREEZE_MS = 150;
+const VICTORY_FADE_MS = 700;
 const MODE_LABELS = {
     G1: 'Centralizado',
     G2: 'Livre',
@@ -49,6 +53,12 @@ const masterAudio = new Audio('trilha.mp3');
 masterAudio.loop = true;
 masterAudio.volume = 0.35;
 let isMasterAudioEnabled = false;
+let hasTriggeredVictoryCinematic = false;
+const INTRO_PLAYLIST = [
+    'ILA ENTRANCE.mp4',
+    'Edição_de_Vídeo_Sem_Título_e_Barra.mp4'
+];
+let currentIntroIndex = 0;
 
 function getOrCreateVoterId(role) {
     const storageKey = `skyaut-voter-id-${role}`;
@@ -82,16 +92,48 @@ function formatMode(mode) {
 
 // Inicialização
 window.addEventListener('load', () => {
+    playIntroByIndex(0);
+});
+
+introVideo.onended = handleIntroEnded;
+introVideo.onerror = handleIntroError;
+document.getElementById('skip-intro').onclick = showMainMenu;
+continueScreen.onclick = openMainMenu;
+
+function playIntroByIndex(index) {
+    if (!INTRO_PLAYLIST[index]) {
+        showMainMenu();
+        return;
+    }
+
+    currentIntroIndex = index;
+    introVideo.src = INTRO_PLAYLIST[currentIntroIndex];
+    introVideo.load();
     introVideo.play().catch(() => {
         // Alguns navegadores podem bloquear autoplay mesmo com vídeo mutado.
         // Mantemos a tela de introdução e deixamos o usuário iniciar/ignorar manualmente.
     });
-});
+}
 
-introVideo.onended = showMainMenu;
-introVideo.onerror = showMainMenu;
-document.getElementById('skip-intro').onclick = showMainMenu;
-continueScreen.onclick = openMainMenu;
+function handleIntroEnded() {
+    const nextIndex = currentIntroIndex + 1;
+    if (INTRO_PLAYLIST[nextIndex]) {
+        playIntroByIndex(nextIndex);
+        return;
+    }
+
+    showMainMenu();
+}
+
+function handleIntroError() {
+    const nextIndex = currentIntroIndex + 1;
+    if (INTRO_PLAYLIST[nextIndex]) {
+        playIntroByIndex(nextIndex);
+        return;
+    }
+
+    showMainMenu();
+}
 
 function showMainMenu() {
     if (introContainer.classList.contains('hidden')) return;
@@ -237,7 +279,8 @@ function initMaster() {
                 phase: 'IDLE',
                 mode: 'G2',
                 timer: 0,
-                votes: {}
+                votes: {},
+                resolvedActions: {}
             });
             return;
         }
@@ -309,8 +352,9 @@ function toggleMasterAudio() {
 
 function endGame() {
     clearInterval(timerInterval);
-    update(ref(db, 'gameState'), { phase: 'IDLE', mode: 'G2', timer: 0, votes: {} });
+    update(ref(db, 'gameState'), { phase: 'IDLE', mode: 'G2', timer: 0, votes: {}, resolvedActions: {} });
     stopMasterAudio();
+    resetVictoryCinematicState();
     showMainMenuFromGame();
 }
 
@@ -321,7 +365,9 @@ function showMainMenuFromGame() {
 }
 
 function startRound() {
-    update(ref(db, 'gameState'), { phase: 'VOTING', timer: 120, votes: {} });
+    hasTriggeredVictoryCinematic = false;
+    resetVictoryCinematicState();
+    update(ref(db, 'gameState'), { phase: 'VOTING', timer: 120, votes: {}, resolvedActions: {} });
     clearInterval(timerInterval);
     timerInterval = setInterval(() => {
         if (currentState.timer > 0) {
@@ -345,7 +391,9 @@ function advanceMode() {
     }
 
     clearInterval(timerInterval);
-    update(ref(db, 'gameState'), { phase: nextPhase, mode: nextMode, timer: 0, votes: {} });
+    hasTriggeredVictoryCinematic = false;
+    resetVictoryCinematicState();
+    update(ref(db, 'gameState'), { phase: nextPhase, mode: nextMode, timer: 0, votes: {}, resolvedActions: {} });
 }
 
 function renderMasterUI() {
@@ -382,6 +430,8 @@ function renderMasterUI() {
             }
             
             btn.innerText = `${opt.text} (${voteCount} votos)`;
+            const isActionResolved = Boolean(currentState.resolvedActions && currentState.resolvedActions[actionKey]);
+            btn.disabled = isActionResolved;
             
             // Apenas o Mestre pode "Executar" a ação
             btn.onclick = () => resolveAction(actionKey, opt);
@@ -394,14 +444,83 @@ function renderMasterUI() {
 }
 
 function resolveAction(actionKey, optionData) {
+    if (currentState.phase !== 'VOTING') return;
+
+    if (currentState.resolvedActions && currentState.resolvedActions[actionKey]) {
+        return;
+    }
+
     if (!optionData.correct) {
         update(ref(db, 'gameState'), { phase: 'END', timer: 0 });
         showResultModal("FALHA CRÍTICA", optionData.failMsg, true);
     } else {
+        const nextResolvedActions = {
+            ...(currentState.resolvedActions || {}),
+            [actionKey]: true
+        };
+
+        update(ref(db, 'gameState'), { resolvedActions: nextResolvedActions });
+
+        const totalActions = Object.keys(GAME_DATA).length;
+        const totalResolved = Object.keys(nextResolvedActions).length;
+        const isLastCorrectDecisionOfDecentralizedRound = currentState.mode === 'G3' && totalResolved === totalActions;
+
+        if (isLastCorrectDecisionOfDecentralizedRound) {
+            update(ref(db, 'gameState'), { phase: 'RESOLUTION', timer: 0 });
+            playVictoryCinematic();
+            return;
+        }
+
         alert(optionData.successMsg || "Ação executada com sucesso. Prossiga para as demais.");
-        // A lógica de vitória total exigiria rastrear se as 4 corretas foram clicadas.
-        // Para simplificar: O Mestre clica na correta e segue. Se errar, falha instantânea.
     }
+}
+
+function playVictoryCinematic() {
+    if (hasTriggeredVictoryCinematic) return;
+    hasTriggeredVictoryCinematic = true;
+    document.body.classList.add('app-frozen');
+
+    setTimeout(() => {
+        victoryCinematic.classList.remove('hidden');
+        victoryCinematic.classList.remove('fade-out', 'darkened');
+        requestAnimationFrame(() => {
+            victoryCinematic.classList.add('active');
+        });
+
+        victoryVideo.currentTime = 0;
+        victoryVideo.onended = finishVictoryCinematic;
+        victoryVideo.onerror = finishVictoryCinematic;
+        victoryVideo.play().catch(() => {
+            finishVictoryCinematic();
+        });
+    }, VICTORY_FREEZE_MS);
+}
+
+function finishVictoryCinematic() {
+    if (!hasTriggeredVictoryCinematic) return;
+
+    victoryCinematic.classList.add('fade-out');
+    setTimeout(() => {
+        victoryCinematic.classList.add('darkened');
+        resetVictoryVideoPlayback();
+        document.body.classList.remove('app-frozen');
+        update(ref(db, 'gameState'), { phase: 'END', timer: 0 });
+        showResultModal('SUCESSO TOTAL', 'Missão concluída com sucesso no round Descentralizado.', false);
+    }, VICTORY_FADE_MS);
+}
+
+function resetVictoryVideoPlayback() {
+    victoryVideo.pause();
+    victoryVideo.currentTime = 0;
+    victoryVideo.onended = null;
+    victoryVideo.onerror = null;
+}
+
+function resetVictoryCinematicState() {
+    document.body.classList.remove('app-frozen');
+    victoryCinematic.classList.add('hidden');
+    victoryCinematic.classList.remove('active', 'fade-out', 'darkened');
+    resetVictoryVideoPlayback();
 }
 
 function showResultModal(title, message, isFailure) {
