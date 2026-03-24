@@ -127,32 +127,59 @@ function loadImageAsset(src) {
 function loadVideoAsset(src) {
     return new Promise((resolve) => {
         const video = document.createElement('video');
+        const timeoutId = setTimeout(() => finish(), 6000);
         const finish = () => {
+            clearTimeout(timeoutId);
             video.removeEventListener('canplaythrough', finish);
+            video.removeEventListener('canplay', finish);
+            video.removeEventListener('loadedmetadata', finish);
             video.removeEventListener('error', finish);
+            video.removeEventListener('stalled', finish);
+            video.removeEventListener('abort', finish);
+            video.removeEventListener('suspend', finish);
             resolve();
         };
 
         video.preload = 'auto';
+        video.muted = true;
         video.src = src;
         video.addEventListener('canplaythrough', finish, { once: true });
+        video.addEventListener('canplay', finish, { once: true });
+        video.addEventListener('loadedmetadata', finish, { once: true });
         video.addEventListener('error', finish, { once: true });
+        video.addEventListener('stalled', finish, { once: true });
+        video.addEventListener('abort', finish, { once: true });
+        video.addEventListener('suspend', finish, { once: true });
+        video.load();
     });
 }
 
 function loadAudioAsset(src) {
     return new Promise((resolve) => {
         const audio = new Audio();
+        const timeoutId = setTimeout(() => finish(), 6000);
         const finish = () => {
+            clearTimeout(timeoutId);
             audio.removeEventListener('canplaythrough', finish);
+            audio.removeEventListener('canplay', finish);
+            audio.removeEventListener('loadedmetadata', finish);
             audio.removeEventListener('error', finish);
+            audio.removeEventListener('stalled', finish);
+            audio.removeEventListener('abort', finish);
+            audio.removeEventListener('suspend', finish);
             resolve();
         };
 
         audio.preload = 'auto';
         audio.src = src;
         audio.addEventListener('canplaythrough', finish, { once: true });
+        audio.addEventListener('canplay', finish, { once: true });
+        audio.addEventListener('loadedmetadata', finish, { once: true });
         audio.addEventListener('error', finish, { once: true });
+        audio.addEventListener('stalled', finish, { once: true });
+        audio.addEventListener('abort', finish, { once: true });
+        audio.addEventListener('suspend', finish, { once: true });
+        audio.load();
     });
 }
 
