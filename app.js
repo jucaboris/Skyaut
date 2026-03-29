@@ -655,7 +655,8 @@ function renderMasterUI() {
 }
 
 function resolveAction(actionKey, optionData) {
-    if (currentState.phase !== 'VOTING') return;
+    const isMasterExecutionPhase = currentState.phase === 'VOTING' || currentState.phase === 'RESOLUTION';
+    if (!isMasterExecutionPhase) return;
 
     if (currentState.resolvedActions && currentState.resolvedActions[actionKey]) {
         return;
