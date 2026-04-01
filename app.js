@@ -277,11 +277,6 @@ document.getElementById('skip-intro').onclick = skipCurrentIntroSegment;
 continueScreen.onclick = openMainMenu;
 
 function initializeAudioSettings() {
-    if (!isMaster) {
-        isMasterAudioEnabled = true;
-        return;
-    }
-
     const savedPreference = localStorage.getItem(MASTER_AUDIO_PREF_KEY);
     isMasterAudioEnabled = savedPreference !== 'false';
 }
@@ -542,7 +537,6 @@ function updateMasterAudioButtonLabel() {
 }
 
 function toggleMasterAudio() {
-    if (!isMaster) return;
     isMasterAudioEnabled = !isMasterAudioEnabled;
     localStorage.setItem(MASTER_AUDIO_PREF_KEY, String(isMasterAudioEnabled));
     updateMasterAudioButtonLabel();
