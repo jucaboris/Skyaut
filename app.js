@@ -48,7 +48,6 @@ const btnToggleMasterAudio = document.getElementById('btn-toggle-master-audio');
 
 // Game State
 let currentState = null;
-const MASTER_AUDIO_PREF_KEY = 'skyaut-master-audio-enabled';
 const VICTORY_FREEZE_MS = 150;
 const VICTORY_FADE_MS = 700;
 const FAILURE_FADE_MS = 700;
@@ -85,24 +84,28 @@ const INTRO_PLAYLIST = [
     'ILA ENTRANCE.mp4',
     'Edição_de_Vídeo_Sem_Título_e_Barra.mp4'
 ];
-const CRITICAL_ASSETS = [
+const STARTUP_ASSETS = [
     'ILA ENTRANCE.mp4',
-    'Edição_de_Vídeo_Sem_Título_e_Barra.mp4',
     AUDIO_ASSETS.BACKGROUND,
-    'Avião_Explodindo_Vídeo_Pronto.mp4',
-    'VICTORY.mp4',
     'menu-background-landscape.png',
     'menu-background-portrait.png',
-    'background-landscape.png',
+    'background-landscape.png'
+];
+const DEFERRED_ASSETS = [
+    'Edição_de_Vídeo_Sem_Título_e_Barra.mp4',
+    'Avião_Explodindo_Vídeo_Pronto.mp4',
+    'VICTORY.mp4',
     'background-portrait.png'
 ];
 if (isMaster) {
-    CRITICAL_ASSETS.push(AUDIO_ASSETS.CORRECT_ANSWER, AUDIO_ASSETS.START_ROUND);
+    DEFERRED_ASSETS.push(AUDIO_ASSETS.CORRECT_ANSWER, AUDIO_ASSETS.START_ROUND);
 }
-const PRELOAD_CACHE_KEY = 'skyaut-critical-assets-loaded-v2';
+const PRELOAD_CACHE_KEY = 'skyaut-startup-assets-loaded-v3';
+const DEFERRED_PRELOAD_CACHE_KEY = 'skyaut-deferred-assets-loaded-v1';
 let currentIntroIndex = 0;
 let loadingCompleted = false;
 let audioUnlockedByGesture = false;
+let deferredPreloadStarted = false;
 
 function getOrCreateVoterId(role) {
     const storageKey = `skyaut-voter-id-${role}`;
@@ -242,11 +245,11 @@ async function preloadCriticalAssets() {
         return;
     }
 
-    updateLoadingProgress(0, 'Preparando recursos da missão...');
+    updateLoadingProgress(0, 'Preparando recursos essenciais da missão...');
     let completedAssets = 0;
-    const totalAssets = CRITICAL_ASSETS.length;
+    const totalAssets = STARTUP_ASSETS.length;
 
-    const loadTasks = CRITICAL_ASSETS.map(async (asset) => {
+    const loadTasks = STARTUP_ASSETS.map(async (asset) => {
         const lowerAsset = asset.toLowerCase();
 
         if (lowerAsset.endsWith('.mp4')) {
@@ -258,11 +261,31 @@ async function preloadCriticalAssets() {
         }
 
         completedAssets += 1;
-        updateLoadingProgress((completedAssets / totalAssets) * 100, `Carregando recursos... (${completedAssets}/${totalAssets})`);
+        updateLoadingProgress((completedAssets / totalAssets) * 100, `Carregando recursos essenciais... (${completedAssets}/${totalAssets})`);
     });
 
     await Promise.all(loadTasks);
     markPreloadCache();
+}
+
+async function preloadDeferredAssets() {
+    if (deferredPreloadStarted || localStorage.getItem(DEFERRED_PRELOAD_CACHE_KEY) === 'ready') return;
+    deferredPreloadStarted = true;
+
+    const loadTasks = DEFERRED_ASSETS.map(async (asset) => {
+        const lowerAsset = asset.toLowerCase();
+
+        if (lowerAsset.endsWith('.mp4')) {
+            await loadVideoAsset(asset);
+        } else if (lowerAsset.endsWith('.mp3') || lowerAsset.endsWith('.wav')) {
+            await loadAudioAsset(asset);
+        } else {
+            await loadImageAsset(asset);
+        }
+    });
+
+    await Promise.all(loadTasks);
+    localStorage.setItem(DEFERRED_PRELOAD_CACHE_KEY, 'ready');
 }
 
 function unlockExperienceStart() {
@@ -284,6 +307,7 @@ async function bootstrapApplication() {
     updateLoadingProgress(0);
     await preloadCriticalAssets();
     unlockExperienceStart();
+    preloadDeferredAssets();
 }
 
 // Inicialização
@@ -298,14 +322,8 @@ document.getElementById('skip-intro').onclick = skipCurrentIntroSegment;
 continueScreen.onclick = openMainMenu;
 
 function initializeAudioSettings() {
-    const savedPreference = localStorage.getItem(MASTER_AUDIO_PREF_KEY);
-    if (!isMaster) {
-        // Jogadores não possuem botão de som, então mantemos a trilha habilitada
-        // por padrão para evitar experiência silenciosa.
-        isMasterAudioEnabled = true;
-        return;
-    }
-    isMasterAudioEnabled = savedPreference !== 'false';
+    // Mantém a mesma política dos roles: áudio ligado por padrão.
+    isMasterAudioEnabled = true;
 }
 
 function skipCurrentIntroSegment() {
@@ -629,7 +647,6 @@ function updateMasterAudioButtonLabel() {
 
 function toggleMasterAudio() {
     isMasterAudioEnabled = !isMasterAudioEnabled;
-    localStorage.setItem(MASTER_AUDIO_PREF_KEY, String(isMasterAudioEnabled));
     updateMasterAudioButtonLabel();
 
     if (isMasterAudioEnabled) {
