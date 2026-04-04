@@ -300,7 +300,9 @@ continueScreen.onclick = openMainMenu;
 function initializeAudioSettings() {
     const savedPreference = localStorage.getItem(MASTER_AUDIO_PREF_KEY);
     if (!isMaster) {
-        isMasterAudioEnabled = false;
+        // Jogadores não possuem botão de som, então mantemos a trilha habilitada
+        // por padrão para evitar experiência silenciosa.
+        isMasterAudioEnabled = true;
         return;
     }
     isMasterAudioEnabled = savedPreference !== 'false';
@@ -356,7 +358,7 @@ function setupAudioUnlockListeners() {
 }
 
 function ensureBackgroundAudio() {
-    if (!isMaster || !isMasterAudioEnabled) return;
+    if (!isMasterAudioEnabled) return;
     backgroundAudio.muted = false;
     backgroundAudio.volume = getBackgroundAudioVolume();
 
