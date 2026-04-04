@@ -98,6 +98,11 @@ const PRELOAD_CACHE_KEY = 'skyaut-critical-assets-loaded-v2';
 let currentIntroIndex = 0;
 let loadingCompleted = false;
 let audioUnlockedByGesture = false;
+const audioCueTracker = {
+    initialized: false,
+    startRoundSeq: 0,
+    correctAnswerSeq: 0
+};
 
 function getOrCreateVoterId(role) {
     const storageKey = `skyaut-voter-id-${role}`;
@@ -347,13 +352,42 @@ function setupAudioUnlockListeners() {
     document.addEventListener('keydown', tryUnlock);
 }
 
+function processAudioCues(state) {
+    if (!state || !state.audioCues) return;
+
+    const currentStartRoundSeq = Number(state.audioCues.startRoundSeq) || 0;
+    const currentCorrectAnswerSeq = Number(state.audioCues.correctAnswerSeq) || 0;
+
+    if (!audioCueTracker.initialized) {
+        audioCueTracker.initialized = true;
+        audioCueTracker.startRoundSeq = currentStartRoundSeq;
+        audioCueTracker.correctAnswerSeq = currentCorrectAnswerSeq;
+        return;
+    }
+
+    if (currentStartRoundSeq > audioCueTracker.startRoundSeq) {
+        playEffect(startRoundAudio);
+    }
+
+    if (currentCorrectAnswerSeq > audioCueTracker.correctAnswerSeq) {
+        playEffect(correctAnswerAudio);
+    }
+
+    audioCueTracker.startRoundSeq = currentStartRoundSeq;
+    audioCueTracker.correctAnswerSeq = currentCorrectAnswerSeq;
+}
+
 function ensureBackgroundAudio() {
     if (!isMasterAudioEnabled) return;
     backgroundAudio.muted = false;
     backgroundAudio.volume = getBackgroundAudioVolume();
 
-    backgroundAudio.play().catch(() => {
+    backgroundAudio.play().catch(async () => {
         // Pode falhar sem interação do usuário em alguns navegadores.
+        await unlockAudioOnGesture();
+        backgroundAudio.play().catch(() => {
+            // Mantém fluxo mesmo sem áudio.
+        });
     });
 }
 
@@ -473,6 +507,7 @@ function initPlayer() {
     onValue(stateRef, (snapshot) => {
         currentState = snapshot.val();
         if(!currentState) return;
+        processAudioCues(currentState);
         renderPlayerUI();
     });
 }
@@ -559,13 +594,15 @@ function initMaster() {
                 mode: 'G2',
                 timer: 0,
                 votes: {},
-                resolvedActions: {}
+                resolvedActions: {},
+                audioCues: { startRoundSeq: 0, correctAnswerSeq: 0 }
             });
             return;
         }
 
         currentState = snapshot.val();
         if(!currentState) return;
+        processAudioCues(currentState);
 
         document.getElementById('master-mode').innerText = `Rodada: ${formatMode(currentState.mode)}`;
         const timerText = currentState.phase === 'VOTING' ? formatCountdown(currentState.timer) : '00:00';
@@ -598,8 +635,13 @@ function stopBackgroundAudio() {
 function playEffect(audioElement) {
     if (!audioElement || !isMasterAudioEnabled) return;
     audioElement.currentTime = 0;
-    audioElement.play().catch(() => {
+    audioElement.play().catch(async () => {
         // Ignora bloqueios de autoplay sem interromper o fluxo do jogo.
+        await unlockAudioOnGesture();
+        audioElement.currentTime = 0;
+        audioElement.play().catch(() => {
+            // Mantém fluxo mesmo sem áudio.
+        });
     });
 }
 
@@ -623,7 +665,7 @@ function toggleMasterAudio() {
 
 function endGame() {
     clearInterval(timerInterval);
-    update(ref(db, 'gameState'), { phase: 'IDLE', mode: 'G2', timer: 0, votes: {}, resolvedActions: {} });
+    update(ref(db, 'gameState'), { phase: 'IDLE', mode: 'G2', timer: 0, votes: {}, resolvedActions: {}, audioCues: { startRoundSeq: 0, correctAnswerSeq: 0 } });
     stopBackgroundAudio();
     resetVictoryCinematicState();
     resetFailureCinematicState();
@@ -642,8 +684,17 @@ function startRound() {
     hasTriggeredFailureCinematic = false;
     resetVictoryCinematicState();
     resetFailureCinematicState();
-    playEffect(startRoundAudio);
-    update(ref(db, 'gameState'), { phase: 'VOTING', timer: 120, votes: {}, resolvedActions: {} });
+    const nextStartRoundSeq = (Number(currentState?.audioCues?.startRoundSeq) || 0) + 1;
+    update(ref(db, 'gameState'), {
+        phase: 'VOTING',
+        timer: 120,
+        votes: {},
+        resolvedActions: {},
+        audioCues: {
+            ...(currentState?.audioCues || {}),
+            startRoundSeq: nextStartRoundSeq
+        }
+    });
     clearInterval(timerInterval);
     timerInterval = setInterval(() => {
         if (currentState.timer > 0) {
@@ -671,7 +722,7 @@ function advanceMode() {
     hasTriggeredFailureCinematic = false;
     resetVictoryCinematicState();
     resetFailureCinematicState();
-    update(ref(db, 'gameState'), { phase: nextPhase, mode: nextMode, timer: 0, votes: {}, resolvedActions: {} });
+    update(ref(db, 'gameState'), { phase: nextPhase, mode: nextMode, timer: 0, votes: {}, resolvedActions: {}, audioCues: currentState?.audioCues || { startRoundSeq: 0, correctAnswerSeq: 0 } });
 }
 
 function renderMasterUI() {
@@ -733,13 +784,19 @@ function resolveAction(actionKey, optionData) {
         update(ref(db, 'gameState'), { phase: 'END', timer: 0 });
         playFailureCinematic(optionData.failMsg);
     } else {
-        playEffect(correctAnswerAudio);
         const nextResolvedActions = {
             ...(currentState.resolvedActions || {}),
             [actionKey]: true
         };
+        const nextCorrectAnswerSeq = (Number(currentState?.audioCues?.correctAnswerSeq) || 0) + 1;
 
-        update(ref(db, 'gameState'), { resolvedActions: nextResolvedActions });
+        update(ref(db, 'gameState'), {
+            resolvedActions: nextResolvedActions,
+            audioCues: {
+                ...(currentState?.audioCues || {}),
+                correctAnswerSeq: nextCorrectAnswerSeq
+            }
+        });
 
         const totalActions = Object.keys(GAME_DATA).length;
         const totalResolved = Object.keys(nextResolvedActions).length;
