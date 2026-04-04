@@ -14,7 +14,7 @@ O projeto possui controle de áudio focado na trilha de fundo (`trilha.mp3`) e n
   - execução/parada da trilha.
 
 ### 2) Jogadores (`?role=...`)
-- O áudio fica forçado como desabilitado (`isMasterAudioEnabled = false`).
+- A trilha de fundo fica habilitada por padrão (`isMasterAudioEnabled = true`).
 - Não há botão de mute dedicado na interface do jogador.
 
 ## Condicionais por momento do jogo
