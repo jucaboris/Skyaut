@@ -59,9 +59,14 @@ const MODE_LABELS = {
 };
 const MENU_AUDIO_VOLUME = 0.5;
 const GAME_AUDIO_VOLUME = MENU_AUDIO_VOLUME * 0.5;
-const backgroundAudio = new Audio('trilha.mp3');
-const correctAnswerAudio = new Audio('fanfare.wav');
-const startRoundAudio = new Audio('Ready_go.mp3');
+const AUDIO_ASSETS = {
+    BACKGROUND: 'trilha.mp3',
+    CORRECT_ANSWER: 'fanfare.wav',
+    START_ROUND: 'Ready_go.mp3'
+};
+const backgroundAudio = new Audio(encodeURI(AUDIO_ASSETS.BACKGROUND));
+const correctAnswerAudio = new Audio(encodeURI(AUDIO_ASSETS.CORRECT_ANSWER));
+const startRoundAudio = new Audio(encodeURI(AUDIO_ASSETS.START_ROUND));
 backgroundAudio.loop = true;
 backgroundAudio.volume = MENU_AUDIO_VOLUME;
 backgroundAudio.preload = 'auto';
@@ -79,9 +84,9 @@ const INTRO_PLAYLIST = [
 const CRITICAL_ASSETS = [
     'ILA ENTRANCE.mp4',
     'Edição_de_Vídeo_Sem_Título_e_Barra.mp4',
-    'trilha.mp3',
-    'fanfare.wav',
-    'Ready_go.mp3',
+    AUDIO_ASSETS.BACKGROUND,
+    AUDIO_ASSETS.CORRECT_ANSWER,
+    AUDIO_ASSETS.START_ROUND,
     'Avião_Explodindo_Vídeo_Pronto.mp4',
     'VICTORY.mp4',
     'menu-background-landscape.png',
@@ -129,7 +134,7 @@ function loadImageAsset(src) {
         const image = new Image();
         image.onload = resolve;
         image.onerror = resolve;
-        image.src = src;
+        image.src = encodeURI(src);
     });
 }
 
@@ -151,7 +156,7 @@ function loadVideoAsset(src) {
 
         video.preload = 'auto';
         video.muted = true;
-        video.src = src;
+        video.src = encodeURI(src);
         video.addEventListener('canplaythrough', finish, { once: true });
         video.addEventListener('canplay', finish, { once: true });
         video.addEventListener('loadedmetadata', finish, { once: true });
@@ -180,7 +185,7 @@ function loadAudioAsset(src) {
         };
 
         audio.preload = 'auto';
-        audio.src = src;
+        audio.src = encodeURI(src);
         audio.addEventListener('canplaythrough', finish, { once: true });
         audio.addEventListener('canplay', finish, { once: true });
         audio.addEventListener('loadedmetadata', finish, { once: true });
@@ -261,9 +266,9 @@ function unlockExperienceStart() {
     loadingStatus.innerText = 'Tudo pronto. Clique em INICIAR MISSÃO.';
 }
 
-function startExperience() {
+async function startExperience() {
     if (!loadingCompleted) return;
-    unlockAudioOnGesture();
+    await unlockAudioOnGesture();
     loadingScreen.classList.add('hidden');
     playIntroByIndex(0);
 }
@@ -289,6 +294,10 @@ continueScreen.onclick = openMainMenu;
 
 function initializeAudioSettings() {
     const savedPreference = localStorage.getItem(MASTER_AUDIO_PREF_KEY);
+    if (!isMaster) {
+        isMasterAudioEnabled = true;
+        return;
+    }
     isMasterAudioEnabled = savedPreference !== 'false';
 }
 
@@ -299,9 +308,9 @@ function skipCurrentIntroSegment() {
 
 async function unlockAudioOnGesture() {
     if (audioUnlockedByGesture) return;
-    audioUnlockedByGesture = true;
-
     const audiosToUnlock = [backgroundAudio, correctAnswerAudio, startRoundAudio];
+    let unlockedCount = 0;
+
     await Promise.all(audiosToUnlock.map(async (audio) => {
         const originalMuted = audio.muted;
         const originalVolume = audio.volume;
@@ -313,19 +322,21 @@ async function unlockAudioOnGesture() {
             await audio.play();
             audio.pause();
             audio.currentTime = 0;
+            unlockedCount += 1;
         } catch (_) {
             // Ignora bloqueios de navegador. Novas tentativas ocorrerão em interações futuras.
-            audioUnlockedByGesture = false;
         } finally {
             audio.muted = originalMuted;
             audio.volume = originalVolume;
         }
     }));
+
+    audioUnlockedByGesture = unlockedCount === audiosToUnlock.length;
 }
 
 function setupAudioUnlockListeners() {
-    const tryUnlock = () => {
-        unlockAudioOnGesture();
+    const tryUnlock = async () => {
+        await unlockAudioOnGesture();
         if (audioUnlockedByGesture) {
             document.removeEventListener('pointerdown', tryUnlock);
             document.removeEventListener('keydown', tryUnlock);
@@ -358,7 +369,7 @@ function playIntroByIndex(index) {
     }
 
     currentIntroIndex = index;
-    introVideo.src = INTRO_PLAYLIST[currentIntroIndex];
+    introVideo.src = encodeURI(INTRO_PLAYLIST[currentIntroIndex]);
     introVideo.muted = false;
     introVideo.load();
     introVideo.play().catch(() => {
