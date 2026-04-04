@@ -60,9 +60,15 @@ const MODE_LABELS = {
 const MENU_AUDIO_VOLUME = 0.5;
 const GAME_AUDIO_VOLUME = MENU_AUDIO_VOLUME * 0.5;
 const backgroundAudio = new Audio('trilha.mp3');
+const correctAnswerAudio = new Audio('fanfare.wav');
+const startRoundAudio = new Audio('Ready_go.mp3');
 backgroundAudio.loop = true;
 backgroundAudio.volume = MENU_AUDIO_VOLUME;
 backgroundAudio.preload = 'auto';
+correctAnswerAudio.preload = 'auto';
+correctAnswerAudio.volume = GAME_AUDIO_VOLUME;
+startRoundAudio.preload = 'auto';
+startRoundAudio.volume = GAME_AUDIO_VOLUME;
 let isMasterAudioEnabled = false;
 let hasTriggeredVictoryCinematic = false;
 let hasTriggeredFailureCinematic = false;
@@ -74,6 +80,8 @@ const CRITICAL_ASSETS = [
     'ILA ENTRANCE.mp4',
     'Edição_de_Vídeo_Sem_Título_e_Barra.mp4',
     'trilha.mp3',
+    'fanfare.wav',
+    'Ready_go.mp3',
     'Avião_Explodindo_Vídeo_Pronto.mp4',
     'VICTORY.mp4',
     'menu-background-landscape.png',
@@ -531,6 +539,14 @@ function stopBackgroundAudio() {
     backgroundAudio.currentTime = 0;
 }
 
+function playEffect(audioElement) {
+    if (!audioElement) return;
+    audioElement.currentTime = 0;
+    audioElement.play().catch(() => {
+        // Ignora bloqueios de autoplay sem interromper o fluxo do jogo.
+    });
+}
+
 function updateMasterAudioButtonLabel() {
     if (!btnToggleMasterAudio) return;
     btnToggleMasterAudio.innerText = isMasterAudioEnabled ? 'Som: Ligado' : 'Som: Desligado';
@@ -570,6 +586,7 @@ function startRound() {
     hasTriggeredFailureCinematic = false;
     resetVictoryCinematicState();
     resetFailureCinematicState();
+    playEffect(startRoundAudio);
     update(ref(db, 'gameState'), { phase: 'VOTING', timer: 120, votes: {}, resolvedActions: {} });
     clearInterval(timerInterval);
     timerInterval = setInterval(() => {
@@ -660,6 +677,7 @@ function resolveAction(actionKey, optionData) {
         update(ref(db, 'gameState'), { phase: 'END', timer: 0 });
         playFailureCinematic(optionData.failMsg);
     } else {
+        playEffect(correctAnswerAudio);
         const nextResolvedActions = {
             ...(currentState.resolvedActions || {}),
             [actionKey]: true
