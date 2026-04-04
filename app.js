@@ -92,6 +92,7 @@ const CRITICAL_ASSETS = [
 const PRELOAD_CACHE_KEY = 'skyaut-critical-assets-loaded-v2';
 let currentIntroIndex = 0;
 let loadingCompleted = false;
+let audioUnlockedByGesture = false;
 
 function getOrCreateVoterId(role) {
     const storageKey = `skyaut-voter-id-${role}`;
@@ -240,7 +241,7 @@ async function preloadCriticalAssets() {
 
         if (lowerAsset.endsWith('.mp4')) {
             await loadVideoAsset(asset);
-        } else if (lowerAsset.endsWith('.mp3')) {
+        } else if (lowerAsset.endsWith('.mp3') || lowerAsset.endsWith('.wav')) {
             await loadAudioAsset(asset);
         } else {
             await loadImageAsset(asset);
@@ -262,12 +263,14 @@ function unlockExperienceStart() {
 
 function startExperience() {
     if (!loadingCompleted) return;
+    unlockAudioOnGesture();
     loadingScreen.classList.add('hidden');
     playIntroByIndex(0);
 }
 
 async function bootstrapApplication() {
     initializeAudioSettings();
+    setupAudioUnlockListeners();
     updateLoadingProgress(0);
     await preloadCriticalAssets();
     unlockExperienceStart();
@@ -294,8 +297,48 @@ function skipCurrentIntroSegment() {
     handleIntroEnded();
 }
 
+async function unlockAudioOnGesture() {
+    if (audioUnlockedByGesture) return;
+    audioUnlockedByGesture = true;
+
+    const audiosToUnlock = [backgroundAudio, correctAnswerAudio, startRoundAudio];
+    await Promise.all(audiosToUnlock.map(async (audio) => {
+        const originalMuted = audio.muted;
+        const originalVolume = audio.volume;
+
+        try {
+            audio.muted = true;
+            audio.volume = 0;
+            audio.currentTime = 0;
+            await audio.play();
+            audio.pause();
+            audio.currentTime = 0;
+        } catch (_) {
+            // Ignora bloqueios de navegador. Novas tentativas ocorrerão em interações futuras.
+            audioUnlockedByGesture = false;
+        } finally {
+            audio.muted = originalMuted;
+            audio.volume = originalVolume;
+        }
+    }));
+}
+
+function setupAudioUnlockListeners() {
+    const tryUnlock = () => {
+        unlockAudioOnGesture();
+        if (audioUnlockedByGesture) {
+            document.removeEventListener('pointerdown', tryUnlock);
+            document.removeEventListener('keydown', tryUnlock);
+        }
+    };
+
+    document.addEventListener('pointerdown', tryUnlock);
+    document.addEventListener('keydown', tryUnlock);
+}
+
 function ensureBackgroundAudio() {
     if (!isMasterAudioEnabled) return;
+    backgroundAudio.muted = false;
     backgroundAudio.volume = getBackgroundAudioVolume();
 
     backgroundAudio.play().catch(() => {
@@ -359,12 +402,14 @@ function showMainMenu() {
 }
 
 function openMainMenu() {
+    unlockAudioOnGesture();
     continueScreen.classList.add('hidden');
     mainMenu.classList.remove('hidden');
     ensureBackgroundAudio();
 }
 
 btnNewSim.onclick = () => {
+    unlockAudioOnGesture();
     mainMenu.classList.add('hidden');
     ensureBackgroundAudio();
 
@@ -540,7 +585,7 @@ function stopBackgroundAudio() {
 }
 
 function playEffect(audioElement) {
-    if (!audioElement) return;
+    if (!audioElement || !isMasterAudioEnabled) return;
     audioElement.currentTime = 0;
     audioElement.play().catch(() => {
         // Ignora bloqueios de autoplay sem interromper o fluxo do jogo.
