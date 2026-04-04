@@ -65,15 +65,19 @@ const AUDIO_ASSETS = {
     START_ROUND: 'Ready_go.mp3'
 };
 const backgroundAudio = new Audio(encodeURI(AUDIO_ASSETS.BACKGROUND));
-const correctAnswerAudio = new Audio(encodeURI(AUDIO_ASSETS.CORRECT_ANSWER));
-const startRoundAudio = new Audio(encodeURI(AUDIO_ASSETS.START_ROUND));
+const correctAnswerAudio = isMaster ? new Audio(encodeURI(AUDIO_ASSETS.CORRECT_ANSWER)) : null;
+const startRoundAudio = isMaster ? new Audio(encodeURI(AUDIO_ASSETS.START_ROUND)) : null;
 backgroundAudio.loop = true;
 backgroundAudio.volume = MENU_AUDIO_VOLUME;
 backgroundAudio.preload = 'auto';
-correctAnswerAudio.preload = 'auto';
-correctAnswerAudio.volume = GAME_AUDIO_VOLUME;
-startRoundAudio.preload = 'auto';
-startRoundAudio.volume = GAME_AUDIO_VOLUME;
+if (correctAnswerAudio) {
+    correctAnswerAudio.preload = 'auto';
+    correctAnswerAudio.volume = GAME_AUDIO_VOLUME;
+}
+if (startRoundAudio) {
+    startRoundAudio.preload = 'auto';
+    startRoundAudio.volume = GAME_AUDIO_VOLUME;
+}
 let isMasterAudioEnabled = false;
 let hasTriggeredVictoryCinematic = false;
 let hasTriggeredFailureCinematic = false;
@@ -85,8 +89,6 @@ const CRITICAL_ASSETS = [
     'ILA ENTRANCE.mp4',
     'Edição_de_Vídeo_Sem_Título_e_Barra.mp4',
     AUDIO_ASSETS.BACKGROUND,
-    AUDIO_ASSETS.CORRECT_ANSWER,
-    AUDIO_ASSETS.START_ROUND,
     'Avião_Explodindo_Vídeo_Pronto.mp4',
     'VICTORY.mp4',
     'menu-background-landscape.png',
@@ -94,15 +96,13 @@ const CRITICAL_ASSETS = [
     'background-landscape.png',
     'background-portrait.png'
 ];
+if (isMaster) {
+    CRITICAL_ASSETS.push(AUDIO_ASSETS.CORRECT_ANSWER, AUDIO_ASSETS.START_ROUND);
+}
 const PRELOAD_CACHE_KEY = 'skyaut-critical-assets-loaded-v2';
 let currentIntroIndex = 0;
 let loadingCompleted = false;
 let audioUnlockedByGesture = false;
-const audioCueTracker = {
-    initialized: false,
-    startRoundSeq: 0,
-    correctAnswerSeq: 0
-};
 
 function getOrCreateVoterId(role) {
     const storageKey = `skyaut-voter-id-${role}`;
@@ -300,7 +300,7 @@ continueScreen.onclick = openMainMenu;
 function initializeAudioSettings() {
     const savedPreference = localStorage.getItem(MASTER_AUDIO_PREF_KEY);
     if (!isMaster) {
-        isMasterAudioEnabled = true;
+        isMasterAudioEnabled = false;
         return;
     }
     isMasterAudioEnabled = savedPreference !== 'false';
@@ -313,7 +313,7 @@ function skipCurrentIntroSegment() {
 
 async function unlockAudioOnGesture() {
     if (audioUnlockedByGesture) return;
-    const audiosToUnlock = [backgroundAudio, correctAnswerAudio, startRoundAudio];
+    const audiosToUnlock = [backgroundAudio, correctAnswerAudio, startRoundAudio].filter(Boolean);
     let unlockedCount = 0;
 
     await Promise.all(audiosToUnlock.map(async (audio) => {
@@ -342,6 +342,9 @@ async function unlockAudioOnGesture() {
 function setupAudioUnlockListeners() {
     const tryUnlock = async () => {
         await unlockAudioOnGesture();
+        if (audioUnlockedByGesture && isMasterAudioEnabled) {
+            ensureBackgroundAudio();
+        }
         if (audioUnlockedByGesture) {
             document.removeEventListener('pointerdown', tryUnlock);
             document.removeEventListener('keydown', tryUnlock);
@@ -352,33 +355,8 @@ function setupAudioUnlockListeners() {
     document.addEventListener('keydown', tryUnlock);
 }
 
-function processAudioCues(state) {
-    if (!state || !state.audioCues) return;
-
-    const currentStartRoundSeq = Number(state.audioCues.startRoundSeq) || 0;
-    const currentCorrectAnswerSeq = Number(state.audioCues.correctAnswerSeq) || 0;
-
-    if (!audioCueTracker.initialized) {
-        audioCueTracker.initialized = true;
-        audioCueTracker.startRoundSeq = currentStartRoundSeq;
-        audioCueTracker.correctAnswerSeq = currentCorrectAnswerSeq;
-        return;
-    }
-
-    if (currentStartRoundSeq > audioCueTracker.startRoundSeq) {
-        playEffect(startRoundAudio);
-    }
-
-    if (currentCorrectAnswerSeq > audioCueTracker.correctAnswerSeq) {
-        playEffect(correctAnswerAudio);
-    }
-
-    audioCueTracker.startRoundSeq = currentStartRoundSeq;
-    audioCueTracker.correctAnswerSeq = currentCorrectAnswerSeq;
-}
-
 function ensureBackgroundAudio() {
-    if (!isMasterAudioEnabled) return;
+    if (!isMaster || !isMasterAudioEnabled) return;
     backgroundAudio.muted = false;
     backgroundAudio.volume = getBackgroundAudioVolume();
 
@@ -507,7 +485,6 @@ function initPlayer() {
     onValue(stateRef, (snapshot) => {
         currentState = snapshot.val();
         if(!currentState) return;
-        processAudioCues(currentState);
         renderPlayerUI();
     });
 }
@@ -594,15 +571,13 @@ function initMaster() {
                 mode: 'G2',
                 timer: 0,
                 votes: {},
-                resolvedActions: {},
-                audioCues: { startRoundSeq: 0, correctAnswerSeq: 0 }
+                resolvedActions: {}
             });
             return;
         }
 
         currentState = snapshot.val();
         if(!currentState) return;
-        processAudioCues(currentState);
 
         document.getElementById('master-mode').innerText = `Rodada: ${formatMode(currentState.mode)}`;
         const timerText = currentState.phase === 'VOTING' ? formatCountdown(currentState.timer) : '00:00';
@@ -633,7 +608,7 @@ function stopBackgroundAudio() {
 }
 
 function playEffect(audioElement) {
-    if (!audioElement || !isMasterAudioEnabled) return;
+    if (!audioElement || !isMaster || !isMasterAudioEnabled) return;
     audioElement.currentTime = 0;
     audioElement.play().catch(async () => {
         // Ignora bloqueios de autoplay sem interromper o fluxo do jogo.
@@ -665,7 +640,7 @@ function toggleMasterAudio() {
 
 function endGame() {
     clearInterval(timerInterval);
-    update(ref(db, 'gameState'), { phase: 'IDLE', mode: 'G2', timer: 0, votes: {}, resolvedActions: {}, audioCues: { startRoundSeq: 0, correctAnswerSeq: 0 } });
+    update(ref(db, 'gameState'), { phase: 'IDLE', mode: 'G2', timer: 0, votes: {}, resolvedActions: {} });
     stopBackgroundAudio();
     resetVictoryCinematicState();
     resetFailureCinematicState();
@@ -684,16 +659,12 @@ function startRound() {
     hasTriggeredFailureCinematic = false;
     resetVictoryCinematicState();
     resetFailureCinematicState();
-    const nextStartRoundSeq = (Number(currentState?.audioCues?.startRoundSeq) || 0) + 1;
+    playEffect(startRoundAudio);
     update(ref(db, 'gameState'), {
         phase: 'VOTING',
         timer: 120,
         votes: {},
-        resolvedActions: {},
-        audioCues: {
-            ...(currentState?.audioCues || {}),
-            startRoundSeq: nextStartRoundSeq
-        }
+        resolvedActions: {}
     });
     clearInterval(timerInterval);
     timerInterval = setInterval(() => {
@@ -722,7 +693,7 @@ function advanceMode() {
     hasTriggeredFailureCinematic = false;
     resetVictoryCinematicState();
     resetFailureCinematicState();
-    update(ref(db, 'gameState'), { phase: nextPhase, mode: nextMode, timer: 0, votes: {}, resolvedActions: {}, audioCues: currentState?.audioCues || { startRoundSeq: 0, correctAnswerSeq: 0 } });
+    update(ref(db, 'gameState'), { phase: nextPhase, mode: nextMode, timer: 0, votes: {}, resolvedActions: {} });
 }
 
 function renderMasterUI() {
@@ -784,18 +755,14 @@ function resolveAction(actionKey, optionData) {
         update(ref(db, 'gameState'), { phase: 'END', timer: 0 });
         playFailureCinematic(optionData.failMsg);
     } else {
+        playEffect(correctAnswerAudio);
         const nextResolvedActions = {
             ...(currentState.resolvedActions || {}),
             [actionKey]: true
         };
-        const nextCorrectAnswerSeq = (Number(currentState?.audioCues?.correctAnswerSeq) || 0) + 1;
 
         update(ref(db, 'gameState'), {
-            resolvedActions: nextResolvedActions,
-            audioCues: {
-                ...(currentState?.audioCues || {}),
-                correctAnswerSeq: nextCorrectAnswerSeq
-            }
+            resolvedActions: nextResolvedActions
         });
 
         const totalActions = Object.keys(GAME_DATA).length;
