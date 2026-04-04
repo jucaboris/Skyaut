@@ -58,7 +58,7 @@ const MODE_LABELS = {
     G3: 'Descentralizado'
 };
 const MENU_AUDIO_VOLUME = 0.5;
-const GAME_AUDIO_VOLUME = MENU_AUDIO_VOLUME;
+const GAME_AUDIO_VOLUME = MENU_AUDIO_VOLUME * 0.5;
 const backgroundAudio = new Audio('trilha.mp3');
 backgroundAudio.loop = true;
 backgroundAudio.volume = MENU_AUDIO_VOLUME;
